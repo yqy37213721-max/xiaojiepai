@@ -122,16 +122,6 @@ function shareRoom() {
     showToast('链接已复制，发送到微信群即可');
   }
 }
-  var ta = document.createElement('textarea');
-  ta.value = roomCode;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  document.body.removeChild(ta);
-  showToast('已复制: ' + roomCode);
-}
 
 // 离开房间
 async function leaveRoom() {
