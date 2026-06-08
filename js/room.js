@@ -43,6 +43,7 @@ function setStoredNickname(name) {
 
 // 确认昵称
 function confirmNickname() {
+  console.log("DEBUG: confirmNickname called");
   var input = document.getElementById('nicknameInput');
   var name = input.value.trim();
   if (!name) {
@@ -584,6 +585,11 @@ document.addEventListener('visibilitychange', function() {
 // =====================================================
 // 启动
 // =====================================================
+window.addEventListener('error', function(e) {
+  console.error('GLOBAL ERROR:', e.message, e.filename, e.lineno);
+  showToast('JS错误: ' + (e.message || '未知'), true);
+});
+
 document.addEventListener('DOMContentLoaded', init);
 
 

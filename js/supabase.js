@@ -1,6 +1,7 @@
 // =====================================================
 // Supabase 客户端初始化（含 10 秒超时）
 // =====================================================
+console.log('DEBUG: Initializing supabase');
 const supabase = window.supabase.createClient(
   SUPABASE_CONFIG.url,
   SUPABASE_CONFIG.anonKey,
