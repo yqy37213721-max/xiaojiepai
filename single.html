@@ -1,0 +1,638 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no">
+  <title>小姐牌 · 单机版</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", Helvetica, Arial, sans-serif;
+      background: #0b0b1a;
+      color: #f0f0f5;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      touch-action: pan-y pinch-zoom;
+      -webkit-touch-callout: none;
+    }
+    @supports (padding: max(0px)) {
+      body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    }
+    .bg {
+      background: linear-gradient(160deg, #0b0b1a 0%, #12122a 40%, #1a0a2e 100%);
+      min-height: 100vh; position: relative;
+    }
+    .bg::before {
+      content: ''; position: fixed; top: -50%; right: -30%;
+      width: 80%; height: 80%;
+      background: radial-gradient(circle, rgba(108,60,225,0.15) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .bg::after {
+      content: ''; position: fixed; bottom: -40%; left: -20%;
+      width: 70%; height: 70%;
+      background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .page {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column;
+      min-height: 100vh; min-height: -webkit-fill-available;
+      padding: 18px 16px; max-width: 480px; margin: 0 auto; width: 100%;
+    }
+    .btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; padding: 16px 24px; border: none; border-radius: 14px;
+      font-size: 17px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s ease; -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+      color: #fff; box-shadow: 0 4px 20px rgba(139,92,246,0.3);
+    }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.08); color: #f0f0f5;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .card {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px; padding: 24px 20px; margin-bottom: 16px;
+    }
+    .input {
+      width: 100%; padding: 14px 16px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+      color: #f0f0f5; font-size: 16px; outline: none; transition: border-color 0.2s;
+    }
+    .input:focus { border-color: rgba(139,92,246,0.5); box-shadow: 0 0 0 3px rgba(139,92,246,0.1); }
+    .input::placeholder { color: rgba(255,255,255,0.25); }
+    .toast {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(0.9);
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+      color: #fff; padding: 14px 28px; border-radius: 12px; font-size: 15px;
+      z-index: 200; opacity: 0; transition: all 0.25s ease;
+      pointer-events: none; text-align: center; max-width: 80vw;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    .toast.err { background: rgba(239,68,68,0.9); }
+
+    .title-block { text-align: center; padding: 28px 0 16px; }
+    .title-block h1 {
+      font-size: 40px; font-weight: 800;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; letter-spacing: 6px; margin-bottom: 4px;
+    }
+    .title-block .sub { font-size: 13px; color: rgba(255,255,255,0.35); letter-spacing: 3px; }
+    .title-block .badge {
+      display: inline-block; margin-top: 6px;
+      padding: 3px 12px; border-radius: 6px;
+      font-size: 11px; font-weight: 600; letter-spacing: 2px;
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.06);
+    }
+    .setup-section { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 4px 0; }
+    .setup-section .row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .row .input { flex: 1; }
+    .row .btn { width: auto; flex-shrink: 0; padding: 14px 18px; }
+    .tag-list {
+      display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px;
+    }
+    .tag {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 12px 8px 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; font-size: 14px;
+    }
+    .tag .del {
+      width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; background: rgba(239,68,68,0.2); color: #ef4444;
+      font-size: 13px; cursor: pointer; transition: 0.15s; flex-shrink: 0;
+    }
+    .tag .del:active { transform: scale(0.85); }
+    .tag .num {
+      width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; font-size: 11px; font-weight: 700;
+      background: rgba(139,92,246,0.2); color: #a78bfa; flex-shrink: 0;
+    }
+    .setup-hint { font-size: 12px; color: rgba(255,255,255,0.25); text-align: center; }
+    .setup-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+    .game-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 2px 0 6px;
+    }
+    .game-header .back {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 13px; color: rgba(255,255,255,0.4); cursor: pointer; padding: 4px;
+    }
+    .game-header .back:active { opacity: 0.6; }
+    .game-header .info {
+      display: flex; align-items: center; gap: 12px; font-size: 12px; color: rgba(255,255,255,0.4);
+    }
+    .game-header .info .num { font-weight: 600; color: rgba(255,255,255,0.6); }
+
+    .card-area { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 2px 0; }
+
+    .card-scene {
+      perspective: 1000px;
+      width: 220px;
+      height: 308px;
+      margin: 0 auto;
+    }
+    .card-wrapper {
+      position: relative; width: 100%; height: 100%;
+      transition: transform 0.6s cubic-bezier(0.23,1,0.32,1);
+      transform-style: preserve-3d;
+    }
+    .card-wrapper.flipped { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute; inset: 0;
+      backface-visibility: hidden; -webkit-backface-visibility: hidden;
+      border-radius: 16px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .card-back {
+      background: linear-gradient(135deg, #6C3CE1, #3B82F6);
+      border: 3px solid rgba(255,255,255,0.15); cursor: pointer;
+      box-shadow: 0 12px 48px rgba(108,60,225,0.35);
+    }
+    .card-back .back-icon { font-size: 64px; opacity: 0.4; }
+    .card-back .back-label {
+      position: absolute; bottom: 26px;
+      font-size: 15px; color: rgba(255,255,255,0.45); letter-spacing: 2px;
+    }
+    .card-back .remain-badge {
+      position: absolute; top: 18px; right: 18px;
+      background: rgba(255,255,255,0.12);
+      padding: 4px 12px; border-radius: 8px;
+      font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7);
+    }
+    .card-front {
+      background: #fff; transform: rotateY(180deg); padding: 14px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.35);
+    }
+    .card-front .corner-top {
+      position: absolute; top: 12px; left: 14px;
+      display: flex; flex-direction: column; align-items: center; line-height: 1;
+    }
+    .card-front .corner-bottom {
+      position: absolute; bottom: 12px; right: 14px;
+      display: flex; flex-direction: column; align-items: center; line-height: 1;
+      transform: rotate(180deg);
+    }
+    .card-front .corner-top .cv, .card-front .corner-bottom .cv { font-size: 18px; font-weight: 800; }
+    .card-front .corner-top .cs, .card-front .corner-bottom .cs { font-size: 14px; }
+    .card-front .center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .card-front .center .big-suit { font-size: 68px; }
+    .card-front .center .big-value { font-size: 48px; font-weight: 800; }
+    .card-front .center .joker-label { font-size: 48px; font-weight: 800; color: #8b5cf6; }
+    .card-front .who-drew {
+      position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+      font-size: 13px; color: #999; white-space: nowrap; font-weight: 500;
+    }
+
+    .rule-area {
+      text-align: center;
+      padding: 16px 0 2px;
+      min-height: 110px;
+    }
+    .rule-area .r-e { font-size: 40px; margin-bottom: 6px; display: none; }
+    .rule-area .r-e.show { display: block; }
+    .rule-area .r-n {
+      font-size: 24px; font-weight: 800; margin-bottom: 6px; display: none;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .rule-area .r-n.show { display: block; }
+    .rule-area .r-d {
+      font-size: 15px; color: rgba(255,255,255,0.55);
+      line-height: 1.6; display: none; padding: 0 4px;
+    }
+    .rule-area .r-d.show { display: block; }
+    .rule-area .r-x {
+      font-size: 15px; margin-top: 8px; display: none; font-weight: 700; padding: 6px 12px;
+      background: rgba(239,68,68,0.12); border-radius: 8px;
+      color: #f87171; letter-spacing: 1px;
+    }
+    .rule-area .r-x.show { display: block; }
+
+    .action-area { padding: 2px 0 6px; }
+    .cur-player {
+      text-align: center; font-size: 14px; color: rgba(255,255,255,0.5);
+      padding: 6px 0;
+    }
+    .cur-player strong { color: #a78bfa; font-weight: 700; font-size: 16px; }
+
+    .states-bar {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; min-height: 20px;
+    }
+    .state-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; font-size: 12px; color: rgba(255,255,255,0.6);
+    }
+    .state-tag .e { font-size: 14px; }
+
+    .hist-section { margin-top: 2px; }
+    .hist-toggle {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 0; font-size: 12px; color: rgba(255,255,255,0.3);
+      cursor: pointer; border: none; background: none; width: 100%; text-align: left;
+    }
+    .hist-list { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .hist-list.open { max-height: 500px; }
+    .hist-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 8px; font-size: 12px; color: rgba(255,255,255,0.4);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .hist-item .hs { color: #a78bfa; font-weight: 600; }
+    .hist-item .hn { color: rgba(255,255,255,0.6); }
+
+    .end-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; padding: 20px; animation: fade-in 0.35s ease-out;
+    }
+    .end-box {
+      background: #1a1a35; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px; padding: 28px 20px 20px;
+      width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto; position: relative;
+    }
+    .end-close {
+      position: absolute; top: 12px; right: 16px;
+      font-size: 20px; color: rgba(255,255,255,0.3); cursor: pointer; padding: 4px;
+    }
+    .end-title { text-align: center; font-size: 26px; font-weight: 800; margin-bottom: 2px; }
+    .end-sub { text-align: center; font-size: 14px; color: rgba(255,255,255,0.4); margin-bottom: 14px; }
+    .end-hl {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px; padding: 10px 14px; font-size: 14px;
+      color: rgba(255,255,255,0.7); text-align: center; margin-bottom: 6px;
+    }
+    .end-stats { margin-bottom: 16px; }
+    .end-player {
+      padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .end-player:last-child { border-bottom: none; }
+    .ep-name { font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.8); margin-bottom: 2px; }
+    .ep-stat { font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.6; }
+    .ep-stat strong { color: #a78bfa; font-weight: 700; }
+    .end-actions { display: flex; flex-direction: column; gap: 10px; }
+
+    @keyframes fade-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+
+    @media (max-width: 360px) {
+      .page { padding: 14px 12px; }
+      .card-scene { width: 180px; height: 252px; }
+      .card-front .center .big-suit { font-size: 52px; }
+      .card-front .center .big-value { font-size: 38px; }
+      .card-front .center .joker-label { font-size: 38px; }
+      .title-block h1 { font-size: 32px; }
+      .rule-area .r-n { font-size: 20px; }
+      .rule-area .r-d { font-size: 13px; }
+    }
+    @media (min-height: 740px) {
+      .card-scene { width: 240px; height: 336px; }
+      .card-front .center .big-suit { font-size: 76px; }
+      .card-front .center .big-value { font-size: 52px; }
+      .card-front .center .joker-label { font-size: 52px; }
+    }
+    @media (min-height: 800px) {
+      .card-scene { width: 260px; height: 364px; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg">
+<div class="page" id="pageSetup" style="display:flex;">
+  <div class="title-block">
+    <h1>小姐牌</h1>
+    <div class="sub">单机版 · 聚会喝酒小游戏</div>
+    <div class="badge">📱 无需网络</div>
+  </div>
+
+  <div class="setup-section">
+    <div class="card" style="padding:20px;">
+      <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.4);letter-spacing:2px;margin-bottom:14px;">👥 添加玩家</div>
+      <div class="row">
+        <input class="input" id="nameInput" placeholder="输入昵称" maxlength="8"
+          onkeydown="if(event.key==='Enter') addPlayer()">
+        <button class="btn btn-primary" onclick="addPlayer()">添加</button>
+      </div>
+      <div class="tag-list" id="tagList">
+        <div style="font-size:13px;color:rgba(255,255,255,0.2);padding:4px 0;">至少添加 2 位玩家</div>
+      </div>
+      <div class="setup-actions">
+        <button class="btn btn-primary" id="startBtn" onclick="startGame()" disabled>开始游戏 🃏</button>
+        <button class="btn btn-secondary" style="width:auto;font-size:14px;padding:14px 18px;flex-shrink:0;" onclick="quickSetup()">快速开始 🎲</button>
+      </div>
+    </div>
+    <div class="setup-hint">每张牌对应一个不同的游戏 🎮</div>
+  </div>
+</div>
+
+<div class="page" id="pageGame" style="display:none;">
+  <div class="game-header">
+    <span class="back" onclick="backToSetup()">← 返回</span>
+    <span class="info">
+      <span style="display:flex;align-items:center;gap:4px;">
+        <span id="remainCards">54</span> 张剩
+      </span>
+      <span class="num" id="roundDisp">第 0 轮</span>
+    </span>
+  </div>
+
+  <div class="card-area">
+    <div class="card-scene" id="cardScene">
+      <div class="card-wrapper" id="cardWrap">
+        <div class="card-face card-back" id="cardBack" onclick="drawCard()">
+          <span class="back-icon">🃏</span>
+          <span class="back-label" id="backLabel">点击抽牌</span>
+          <span class="remain-badge" id="remainBadge">54</span>
+        </div>
+        <div class="card-face card-front" id="cardFront">
+          <div class="corner-top">
+            <span class="cv" id="cornerV"></span>
+            <span class="cs" id="cornerS"></span>
+          </div>
+          <div class="center">
+            <span class="big-suit" id="midSuit"></span>
+            <span class="big-value" id="midVal"></span>
+            <span class="joker-label" id="jokerLbl"></span>
+          </div>
+          <div class="corner-bottom">
+            <span class="cv" id="cornerV2"></span>
+            <span class="cs" id="cornerS2"></span>
+          </div>
+          <span class="who-drew" id="whoDrew"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule-area">
+      <div class="r-e" id="rE"></div>
+      <div class="r-n" id="rN"></div>
+      <div class="r-d" id="rD"></div>
+      <div class="r-x" id="rX"></div>
+    </div>
+  </div>
+
+  <div class="action-area">
+    <button class="btn btn-primary" id="drawBtn" onclick="drawCard()">开始抽牌 🃏</button>
+    <div class="cur-player">轮到: <strong id="curName">--</strong></div>
+  </div>
+
+  <div class="card" style="padding:10px 14px;margin-bottom:0;">
+    <div class="states-bar" id="statesBar"></div>
+    <div class="hist-section">
+      <button class="hist-toggle" onclick="toggleHistory()">
+        ▸ <span id="histLabel">抽牌记录</span>
+      </button>
+      <div class="hist-list" id="histList"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =====================================================
+// 小姐牌 · 单机版 — 15种完全不同的游戏
+// =====================================================
+const RULES = {
+  'A':    { n:'👑 命令牌', e:'👑', d:'抽到者指定任意一人喝 1 杯！👑 权力之牌，你说了算！' },
+  '2':    { n:'👩 小姐牌', e:'👩', d:'抽到者成为"小姐"👩，之后每次有人喝酒，都可喊"小姐陪我喝！"，小姐必须陪喝 1 杯。直到下一张 2 出现替换新小姐。' },
+  '3':    { n:'🌳 逛三园', e:'🌳', d:'抽牌者说"星期天，逛三园，什么园？"选（动物园/植物园/果园），轮流说该园内事物，卡住或重复者罚酒🍺。' },
+  '4':    { n:'👃 摸鼻子', e:'👃', d:'抽牌者随时可以摸自己鼻子👃，其他人看到必须立刻跟着摸。最后摸到鼻子的人喝酒🍺！' },
+  '5':    { n:'📸 照相机', e:'📸', d:'抽牌者获得"照相机"📸，可随时喊"咔嚓"所有人必须定格，先动的人喝酒🍺！持续到下一张 5 出现。' },
+  '6':    { n:'🌿 柳树扭一扭', e:'🌿', d:'抽牌者说"柳树扭一扭，扭到 X！"然后轮流说"扭一扭"，到第 X 次说错的人罚酒🍺！' },
+  '7':    { n:'7️⃣ 逢七过', e:'7️⃣', d:'从抽牌者开始顺时针报数，逢 7 和 7 的倍数要说"过"🙅，说错或卡住的人罚酒🍺！' },
+  '8':    { n:'🚽 厕所牌', e:'🚽', d:'抽到者获得"如厕许可证"🚽，只有持 8 者可以去厕所！没牌去厕所罚酒🍺！' },
+  '9':    { n:'🍺 自罚一杯', e:'🍺', d:'抽牌者自己喝 1 杯！🍺 站起来举杯说"我干了！"没站起来再罚 1 杯！' },
+  '10':   { n:'🤪 神经病', e:'🤪', d:'抽到者成为"神经病"🤪，此后任何人不能理他！谁跟他说话谁喝酒🍺！直到下一张 10 替换。' },
+  'J':    { n:'👈 左边喝', e:'👈', d:'抽牌者左边的人喝 1 杯！🍺' },
+  'Q':    { n:'👉 右边喝', e:'👉', d:'抽牌者右边的人喝 1 杯！🍺' },
+  'K':    { n:'📜 自定规矩', e:'📜', d:'抽牌者自己喝 1 杯🍺，并为游戏定一条新规矩！全场必须遵守！' },
+  'small_joker': { n:'🃏 小王', e:'🃏', d:'小王驾到！指定任意一人喝 1 杯！🍺' },
+  'big_joker':   { n:'🃏 大王', e:'🃏', d:'大王驾到！指定任意一人喝 2 杯！！🍺🍺' },
+};
+const SUITS = { spade:'♠', heart:'♥', diamond:'♦', club:'♣' };
+const SCOLORS = { spade:'#1a1a2e', heart:'#ef4444', diamond:'#ef4444', club:'#1a1a2e' };
+
+let players = [], deck = [], drawn = [], curIdx = 0;
+let ss = { miss:null, camera:false, crazy:null, toilet:null };
+let histOpen = false, isDrawing = false;
+const $ = i => document.getElementById(i);
+
+function toast(m, e) {
+  const t = $('toast'); t.textContent = m;
+  t.className = 'toast show' + (e ? ' err' : '');
+  clearTimeout(t._t); t._t = setTimeout(() => t.className = 'toast', 2000);
+}
+
+function addPlayer() {
+  const n = $('nameInput').value.trim();
+  if (!n) { toast('请输入昵称', true); return; }
+  if (players.length >= 10) { toast('最多 10 位玩家', true); return; }
+  if (players.includes(n)) { toast('昵称已存在', true); return; }
+  players.push(n); $('nameInput').value = ''; $('nameInput').focus();
+  renderTags();
+}
+function removePlayer(i) { players.splice(i, 1); renderTags(); }
+function renderTags() {
+  const el = $('tagList'), sb = $('startBtn');
+  if (!players.length) { el.innerHTML = '<div style="font-size:13px;color:rgba(255,255,255,0.2);padding:4px 0;">至少添加 2 位玩家</div>'; sb.disabled = true; return; }
+  el.innerHTML = players.map((p,i) =>
+    '<div class="tag"><span class="num">'+(i+1)+'</span><span>'+p+'</span><span class="del" onclick="removePlayer('+i+')">✕</span></div>'
+  ).join('');
+  sb.disabled = players.length < 2;
+}
+function quickSetup() {
+  const d = ['张三','李四','王五','赵六'];
+  for (const n of d) { if (players.length < 6 && !players.includes(n)) players.push(n); }
+  renderTags(); toast('已添加默认玩家');
+}
+
+function startGame() {
+  if (players.length < 2) { toast('至少需要 2 位玩家', true); return; }
+  const cards = [];
+  for (const s of ['spade','heart','diamond','club'])
+    for (const v of ['A','2','3','4','5','6','7','8','9','10','J','Q','K'])
+      cards.push({ suit:s, value:v });
+  cards.push({ suit:'joker', value:'small_joker' }, { suit:'joker', value:'big_joker' });
+  for (let i = cards.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [cards[i],cards[j]] = [cards[j],cards[i]]; }
+  deck = cards; drawn = []; curIdx = 0;
+  ss = { miss:null, camera:false, crazy:null, toilet:null };
+  histOpen = false; isDrawing = false;
+  $('pageSetup').style.display = 'none'; $('pageGame').style.display = 'flex';
+  updateUI(); resetCard(); toast('游戏开始！');
+}
+function backToSetup() {
+  if (drawn.length && !confirm('确定退出当前游戏吗？')) return;
+  $('pageGame').style.display = 'none'; $('pageSetup').style.display = 'flex';
+}
+
+function cardInfo(c) {
+  if (c.suit === 'joker') return { s: c.value==='small_joker'?'小':'大', su:'🃏', co:'#8b5cf6', j:true };
+  return { s: c.value, su: SUITS[c.suit]||'?', co: SCOLORS[c.suit]||'#fff', j:false };
+}
+function rule(c) { return RULES[c.value] || { n:'?', e:'❓', d:'未知牌' }; }
+function left(i) { return (i-1+players.length)%players.length; }
+function right(i) { return (i+1)%players.length; }
+
+function drawCard() {
+  if (isDrawing || curIdx >= deck.length) return;
+  isDrawing = true;
+  const btn = $('drawBtn'); btn.disabled = true; btn.textContent = '抽牌中...';
+  setTimeout(() => {
+    const c = deck[curIdx], pi = curIdx % players.length, pn = players[pi], r = rule(c);
+    switch (c.value) {
+      case '2': ss.miss = pi; break;
+      case '5': ss.camera = true; break;
+      case '10': ss.crazy = pi; break;
+      case '8': ss.toilet = pi; break;
+    }
+    drawn.push({ pi, pn, card:c, rn:r.n, re:r.e });
+    curIdx++;
+    showCard(c,pn); showRule(c,r,pi); updateUI(); renderHist(); renderStates();
+    if (curIdx >= deck.length) {
+      btn.style.display = 'none'; $('backLabel').textContent = '牌已抽完';
+      setTimeout(showEnd,800);
+    } else { btn.disabled = false; btn.textContent = '抽牌 🃏'; }
+    isDrawing = false;
+  }, 200);
+}
+
+function resetCard() {
+  $('cardWrap').className = 'card-wrapper';
+  $('backLabel').textContent = '点击抽牌';
+  $('remainBadge').textContent = deck.length;
+  $('rE').className = 'r-e'; $('rN').className = 'r-n';
+  $('rD').className = 'r-d'; $('rX').className = 'r-x';
+}
+
+function showCard(c, pn) {
+  const d = cardInfo(c), w = $('cardWrap');
+  const cv=$('cornerV'),cs=$('cornerS'),cv2=$('cornerV2'),cs2=$('cornerS2');
+  const ms=$('midSuit'),mv=$('midVal'),jl=$('jokerLbl');
+  if (d.j) {
+    cv.textContent=d.s; cs.textContent=d.su; cv2.textContent=d.s; cs2.textContent=d.su;
+    ms.textContent=d.su; mv.textContent=''; jl.textContent=d.s+'王';
+    [cv,cs,cv2,cs2,ms,jl].forEach(e=>e.style.color=d.co);
+  } else {
+    cv.textContent=d.s; cs.textContent=d.su; cv2.textContent=d.s; cs2.textContent=d.su;
+    ms.textContent=d.su; mv.textContent=d.s; jl.textContent='';
+    [cv,cs,cv2,cs2,ms,mv].forEach(e=>e.style.color=d.co);
+  }
+  $('whoDrew').textContent = pn+' 抽到';
+  w.className = 'card-wrapper flipped';
+}
+
+function showRule(c, r, pi) {
+  $('rE').textContent = r.e; $('rE').className = 'r-e show';
+  $('rN').textContent = r.n; $('rN').className = 'r-n show';
+  $('rD').textContent = r.d; $('rD').className = 'r-d show';
+  let x = '';
+  if (c.value === '9') x = '🍺 '+players[pi]+' 自罚 1 杯！站起来说"我干了"！';
+  else if (c.value === 'A') x = '👑 '+players[pi]+' 获得命令牌，指定任意一人喝 1 杯！';
+  else if (c.value === '2') x = '👩 '+players[pi]+' 现在是小姐！谁喝酒都可喊她陪喝！';
+  else if (c.value === 'J') x = '👈 左边 '+players[left(pi)]+' 喝 1 杯！';
+  else if (c.value === 'Q') x = '👉 右边 '+players[right(pi)]+' 喝 1 杯！';
+  else if (c.value === 'K') x = '📜 '+players[pi]+' 自罚 1 杯，并定一条新规矩！';
+  else if (c.value === '10') x = '🤪 '+players[pi]+' 现在是神经病！';
+  else if (c.value === '8') x = '🚽 '+players[pi]+' 获得厕所资格！';
+  else if (c.value === 'small_joker') x = '🃏 '+players[pi]+' 指定任意一人喝 1 杯！';
+  else if (c.value === 'big_joker') x = '🃏 '+players[pi]+' 指定任意一人喝 2 杯！！';
+  const rx = $('rX');
+  if (x) { rx.textContent=x; rx.className='r-x show'; }
+  else rx.className='r-x';
+}
+
+function updateUI() {
+  const r = deck.length-curIdx;
+  $('remainCards').textContent=r; $('remainBadge').textContent=r;
+  $('roundDisp').textContent='第 '+curIdx+' 轮';
+  $('curName').textContent = curIdx<deck.length?players[curIdx%players.length]:'--';
+  const btn=$('drawBtn');
+  if (curIdx>=deck.length) btn.style.display='none';
+  else { btn.style.display='flex'; btn.textContent=curIdx===0?'开始抽牌 🃏':'抽牌 🃏'; }
+}
+
+function renderStates() {
+  const b=$('statesBar'),t=[];
+  if (ss.miss!=null) t.push('<span class="state-tag"><span class="e">👩</span> 小姐: '+players[ss.miss]+'</span>');
+  if (ss.camera) t.push('<span class="state-tag"><span class="e">📸</span> 照相机生效中</span>');
+  if (ss.crazy!=null) t.push('<span class="state-tag"><span class="e">🤪</span> 神经病: '+players[ss.crazy]+'</span>');
+  if (ss.toilet!=null) t.push('<span class="state-tag"><span class="e">🚽</span> 厕所: '+players[ss.toilet]+'</span>');
+  b.innerHTML = t.join('');
+}
+
+function toggleHistory() { histOpen=!histOpen; $('histList').className='hist-list'+(histOpen?' open':''); }
+
+function renderHist() {
+  const el=$('histList');
+  $('histLabel').textContent='抽牌记录 ('+drawn.length+')';
+  if (!drawn.length) { el.innerHTML='<div style="font-size:12px;color:rgba(255,255,255,0.15);padding:8px;">暂无记录</div>'; return; }
+  el.innerHTML=drawn.slice(-30).map(d=>{
+    const cd=d.card.suit==='joker'?(d.card.value==='small_joker'?'🃏小':'🃏大'):(SUITS[d.card.suit]||'')+d.card.value;
+    return '<div class="hist-item"><span class="hs">'+d.pn+'</span> 抽到 <span class="hn">'+cd+'</span> · '+d.rn+'</div>';
+  }).join('');
+  if (drawn.length>30) el.innerHTML+='<div style="font-size:11px;color:rgba(255,255,255,0.12);padding:4px 8px;">仅显示最近30条</div>';
+  if (histOpen) el.className='hist-list open';
+}
+
+function showEnd() {
+  if (!drawn.length) return;
+  const st={};
+  for (let i=0;i<players.length;i++) st[i]={t:0,A:0,'2':0,'5':0,'8':0,'10':0,'9':0,J:0,Q:0,K:0,j:0};
+  for (const d of drawn) { const s=st[d.pi]; if(!s)continue; s.t++; if(d.card.value==='small_joker'||d.card.value==='big_joker') s.j++; else if(s[d.card.value]!==undefined) s[d.card.value]++; }
+  let md=0,dk=null,mdraw=0,dwk=null;
+  for (const i in st) { if(st[i]['9']>md){md=st[i]['9'];dk=i;} if(st[i].t>mdraw){mdraw=st[i].t;dwk=i;} }
+  let html='<div class="end-overlay" id="endOverlay"><div class="end-box">';
+  html+='<div class="end-close" onclick="closeEnd()">✕</div>';
+  html+='<div class="end-title">🎉 游戏结束 🎉</div>';
+  html+='<div class="end-sub">共 '+drawn.length+' 张牌</div>';
+  if(dk!=null) html+='<div class="end-hl">🍺 酒王: '+players[dk]+'（喝了 '+md+' 杯）</div>';
+  if(dwk!=null) html+='<div class="end-hl">🃏 手气最佳: '+players[dwk]+'（抽了 '+mdraw+' 张）</div>';
+  html+='<div class="end-stats">';
+  for(let i=0;i<players.length;i++){const s=st[i];
+    html+='<div class="end-player"><div class="ep-name">'+players[i]+'</div><div class="ep-stat">抽了 <strong>'+s.t+'</strong> 张';
+    if(s.A>0) html+=' · 👑命令牌×'+s.A;
+    if(s['2']>0) html+=' · 👩小姐牌×'+s['2'];
+    if(s['5']>0) html+=' · 📸相机×'+s['5'];
+    if(s['8']>0) html+=' · 🚽厕所×'+s['8'];
+    if(s['10']>0) html+=' · 🤪神经×'+s['10'];
+    if(s['9']>0) html+=' · 🍺喝×'+s['9'];
+    if(s.j>0) html+=' · 🃏王×'+s.j;
+    if(s.J>0||s.Q>0||s.K>0) html+=' · 指人'+(s.J+s.Q+s.K)+'次';
+    html+='</div></div>';
+  }
+  html+='</div><div class="end-actions">';
+  html+='<button class="btn btn-primary" onclick="closeEnd();startGame()">再来一局 🎮</button>';
+  html+='<button class="btn btn-secondary" onclick="closeEnd();backToSetup()">返回大厅</button>';
+  html+='</div></div></div>';
+  document.body.appendChild((d=>{d.innerHTML=html;return d.firstElementChild;})(document.createElement('div')));
+}
+function closeEnd(){const el=document.getElementById('endOverlay');if(el)el.remove();}
+</script>
+</body>
+</html>

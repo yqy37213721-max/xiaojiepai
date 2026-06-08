@@ -1,0 +1,373 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>游戏 - 小姐牌</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ---- 卡牌翻转 ---- */
+    .card-scene {
+      perspective: 1000px;
+      width: 160px;
+      height: 224px;
+      margin: 0 auto;
+    }
+    .card-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-style: preserve-3d;
+    }
+    .card-wrapper.flipped {
+      transform: rotateY(180deg);
+    }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .card-back {
+      background: linear-gradient(135deg, #6C3CE1, #3B82F6);
+      border: 2px solid rgba(255,255,255,0.15);
+      cursor: pointer;
+    }
+    .card-back::after {
+      content: '🃏';
+      font-size: 48px;
+      opacity: 0.6;
+    }
+    .card-back span {
+      position: absolute;
+      bottom: 20px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+    }
+    .card-front {
+      background: #fff;
+      transform: rotateY(180deg);
+      padding: 12px;
+    }
+    .card-front .cv {
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .card-front .cs {
+      font-size: 28px;
+      line-height: 1;
+      margin-top: 4px;
+    }
+    .card-front .cjoker {
+      font-size: 40px;
+      margin-bottom: 4px;
+    }
+    .card-draw-hint {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+    }
+
+    /* ---- 规则展示 ---- */
+    .rule-display {
+      text-align: center;
+      padding: 12px 0 8px;
+      min-height: 80px;
+    }
+    .rule-display .r-emoji {
+      font-size: 32px;
+      margin-bottom: 4px;
+      display: none;
+    }
+    .rule-display .r-emoji.show { display: block; }
+    .rule-display .r-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      display: none;
+    }
+    .rule-display .r-name.show { display: block; }
+    .rule-display .r-desc {
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.5;
+      display: none;
+    }
+    .rule-display .r-desc.show { display: block; }
+    .rule-display .r-who {
+      font-size: 13px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 6px;
+      display: none;
+    }
+    .rule-display .r-who.show { display: block; }
+
+    /* ---- 游戏信息条 ---- */
+    .info-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+    }
+    .info-bar .round {
+      font-weight: 600;
+      color: rgba(255,255,255,0.6);
+    }
+
+    /* ---- 当前轮到 ---- */
+    .turn-indicator {
+      text-align: center;
+      padding: 10px 0;
+      font-size: 15px;
+      color: rgba(255,255,255,0.5);
+    }
+    .turn-indicator strong {
+      color: #a78bfa;
+      font-weight: 700;
+    }
+    .turn-indicator .is-me {
+      color: #4ade80;
+    }
+
+    /* ---- 特殊状态条 ---- */
+    .states-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 0;
+      min-height: 20px;
+    }
+    .state-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+    }
+    .state-tag .emoji { font-size: 14px; }
+
+    /* ---- 历史 ---- */
+    .history-section {
+      margin-top: 4px;
+    }
+    .history-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 0;
+      font-size: 13px;
+      color: rgba(255,255,255,0.3);
+      cursor: pointer;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .history-toggle:hover { color: rgba(255,255,255,0.5); }
+    .history-list {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .history-list.open { max-height: 600px; }
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .history-item .hs { color: #a78bfa; font-weight: 600; }
+    .history-item .hn { color: rgba(255,255,255,0.6); }
+
+    /* ---- 响应式 ---- */
+    @media (max-width: 360px) {
+      .card-scene { width: 140px; height: 196px; }
+      .card-front .cv { font-size: 30px; }
+      .card-front .cs { font-size: 24px; }
+    }
+    @media (min-height: 740px) {
+      .card-scene { width: 180px; height: 252px; }
+    }
+      /* ---- 结算弹窗 ---- */
+    .end-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200;
+      padding: 20px;
+      animation: modal-in 0.4s ease-out;
+    }
+    .end-box {
+      background: #1a1a35;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      padding: 32px 24px 24px;
+      width: 100%;
+      max-width: 400px;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    .end-close {
+      position: absolute; top: 12px; right: 16px;
+      font-size: 20px; color: rgba(255,255,255,0.3);
+      cursor: pointer; padding: 4px;
+    }
+    .end-title {
+      text-align: center;
+      font-size: 26px; font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .end-sub {
+      text-align: center;
+      font-size: 14px; color: rgba(255,255,255,0.4);
+      margin-bottom: 16px;
+    }
+    .end-highlights {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .end-hl {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+      text-align: center;
+    }
+    .end-stats {
+      margin-bottom: 20px;
+    }
+    .end-player {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .end-player:last-child { border-bottom: none; }
+    .ep-name {
+      font-size: 15px; font-weight: 600;
+      color: rgba(255,255,255,0.8);
+      margin-bottom: 2px;
+    }
+    .ep-stat {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      line-height: 1.6;
+    }
+    .ep-stat strong {
+      color: #a78bfa;
+      font-weight: 700;
+    }
+    .end-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    </style>
+</head>
+<body>
+  <div class="bg-gradient">
+    <div class="page" id="gamePage" style="display:none;">
+      <!-- 顶栏 -->
+      <div class="info-bar">
+        <span onclick="exitGame()" style="cursor:pointer;">← <span id="gRoomCode">----</span></span>
+        <span style="display:flex;align-items:center;gap:12px;">
+          <span onclick="shareGame()" style="cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);">分享</span>
+          <span class="round"><span id="roundNum">0</span>/<span id="totalCards">54</span> 轮</span>
+        </span>
+      </div>
+
+      <!-- 卡牌区 -->
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:8px 0;">
+        <div class="card-scene" id="cardScene">
+          <div class="card-wrapper" id="cardWrapper">
+            <!-- 背面 -->
+            <div class="card-face card-back" id="cardBack" onclick="onCardClick()">
+              <span id="backHint">点击抽牌</span>
+            </div>
+            <!-- 正面 -->
+            <div class="card-face card-front" id="cardFront">
+              <div class="cjoker" id="cJoker"></div>
+              <div class="cv" id="cValue"></div>
+              <div class="cs" id="cSuit"></div>
+              <div class="card-draw-hint" id="cardWho"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 规则 -->
+        <div class="rule-display">
+          <div class="r-emoji" id="rEmoji"></div>
+          <div class="r-name" id="rName"></div>
+          <div class="r-desc" id="rDesc"></div>
+          <div class="r-who" id="rWho"></div>
+        </div>
+      </div>
+
+      <!-- 抽牌按钮 / 轮到 -->
+      <div id="actionArea">
+        <button class="btn btn-primary" id="drawBtn" onclick="drawCard()" style="display:none;">
+          抽牌 🃏
+        </button>
+        <div class="turn-indicator" id="turnIndicator">
+          轮到: <strong id="turnPlayer">--</strong>
+        </div>
+      </div>
+
+      <!-- 特殊状态 & 历史 -->
+      <div class="card" style="padding:12px 16px;margin-bottom:0;">
+        <div class="states-bar" id="statesBar"></div>
+        <div class="history-section">
+          <button class="history-toggle" onclick="toggleHistory()">
+            ▸ <span id="histLabel">抽牌记录</span>
+          </button>
+          <div class="history-list" id="historyList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 加载 -->
+    <div class="page" id="loadingPage">
+      <div class="loading-page">
+        <div class="loading-spinner"></div>
+        <span>加载游戏...</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/realtime.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
+

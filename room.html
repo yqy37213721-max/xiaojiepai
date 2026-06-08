@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>小姐牌 · 房间</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div class="bg-gradient">
+    <div class="page" id="roomPage" style="display:none;">
+      <!-- 顶部：房间号 -->
+      <div class="room-code-display">
+        <div class="label">房间号</div>
+        <div class="code" id="roomCodeDisplay">----</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+          <button class="copy-btn" id="copyRoomBtn" onclick="copyRoomCode()">复制房间号</button>
+          <button class="copy-btn" id="shareRoomBtn" onclick="shareRoom()">邀请好友</button>
+        </div>
+      </div>
+
+      <!-- 玩家列表标题 -->
+      <div class="card" style="flex:1;display:flex;flex-direction:column;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0;">玩家列表</div>
+          <span id="playerCount" style="font-size:13px;color:rgba(255,255,255,0.3);">0 人</span>
+        </div>
+        <div class="player-list" id="playerList">
+          <div class="empty-state">等待玩家加入...</div>
+        </div>
+      </div>
+
+      <!-- 底部按钮 -->
+      <div class="bottom-actions">
+        <button class="btn btn-highlight" id="startGameBtn" onclick="startGame()" style="display:none;">
+          开始游戏
+        </button>
+        <div class="hint" id="waitingHint">等待房主开始游戏...</div>
+        <button class="btn btn-secondary btn-small" onclick="leaveRoom()" style="margin-top:4px;">
+          离开房间
+        </button>
+      </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <div class="page" id="loadingPage">
+      <div class="loading-page">
+        <div class="loading-spinner"></div>
+        <span>连接中...</span>
+      </div>
+    </div>
+
+    <!-- 昵称弹窗 -->
+    <div class="modal-overlay" id="nicknameModal">
+      <div class="modal-box">
+        <h2>请输入昵称</h2>
+        <p>给小伙伴们一个称呼吧</p>
+        <input
+          class="input"
+          id="nicknameInput"
+          type="text"
+          maxlength="10"
+          placeholder="输入你的昵称"
+          autocomplete="off"
+          onkeydown="if(event.key==='Enter') confirmNickname()"
+        >
+        <button class="btn btn-primary" onclick="confirmNickname()">
+          进入房间
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/realtime.js"></script>
+  <script src="js/room.js"></script>
+</body>
+</html>
+
