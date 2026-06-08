@@ -52,6 +52,12 @@ function confirmNickname() {
   }
   setStoredNickname(name);
   document.getElementById('nicknameModal').style.display = 'none';
+  // 显示加载状态
+  var loadingEl = document.getElementById('loadingPage');
+  if (loadingEl) {
+    loadingEl.style.display = 'flex';
+    loadingEl.querySelector('span').textContent = '加入房间中...';
+  }
   nicknameModalShown = true;
   joinRoomChannel();
 }
@@ -304,7 +310,8 @@ async function joinRoomChannel() {
 
   } catch (err) {
     console.error('joinRoomChannel error:', err);
-    showToast('加入房间失败：' + (err.message || '未知错误'), true);
+    var msg = err.message || err.toString() || '未知错误';
+    showToast('加入房间失败：' + msg, true);
   }
 }
 
