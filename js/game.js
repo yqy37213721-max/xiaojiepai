@@ -96,6 +96,16 @@ function getPlayerBySeat(seat) {
 function exitGame() {
   if (!confirm('确定退出游戏吗？')) return;
   RealtimeManager.unsubscribe();
+  // 标记离线
+  if (roomId && currentPlayerUuid) {
+    supabase
+      .from('players')
+      .update({ is_online: false, updated_at: new Date().toISOString() })
+      .eq('room_id', roomId)
+      .eq('player_uuid', currentPlayerUuid)
+      .then(function() {})
+      .catch(function() {});
+  }
   window.location.href = 'index.html';
 }
 
@@ -727,9 +737,37 @@ async function init() {
         mySeat = meRes.data.seat_number;
         myNickname = meRes.data.nickname;
       } else {
-        showToast('你不是本房间的玩家', true);
-        setTimeout(function() { window.location.href = 'index.html'; }, 1500);
-        return;
+        // 用昵称尝试找回身份（适用于 localStorage 被清、换设备等情况）
+        var storedNickname = getStoredNickname();
+        if (storedNickname) {
+          var byNickRes = await supabase
+            .from('players')
+            .select('*')
+            .eq('room_id', roomId)
+            .eq('nickname', storedNickname)
+            .maybeSingle();
+          if (byNickRes.data) {
+            // 找到旧身份，更新 UUID 重新加入
+            await supabase
+              .from('players')
+              .update({ player_uuid: currentPlayerUuid, is_online: true, updated_at: new Date().toISOString() })
+              .eq('id', byNickRes.data.id);
+            mySeat = byNickRes.data.seat_number;
+            myNickname = byNickRes.data.nickname;
+            // 刷新玩家列表
+            var plRef = await supabase.from('players').select('*').eq('room_id', roomId);
+            if (plRef.data) players = plRef.data;
+            showToast('已重新加入游戏！', false);
+          } else {
+            showToast('你不是本房间的玩家', true);
+            setTimeout(function() { window.location.href = 'index.html'; }, 1500);
+            return;
+          }
+        } else {
+          showToast('你不是本房间的玩家', true);
+          setTimeout(function() { window.location.href = 'index.html'; }, 1500);
+          return;
+        }
       }
     }
 
