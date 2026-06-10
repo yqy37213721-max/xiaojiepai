@@ -81,7 +81,8 @@ async function createRoom() {
 
     if (playerRes.error) throw playerRes.error;
 
-    // 5. 跳转房间页
+    // 5. 保存房间历史并跳转
+    saveRoomHistory(roomCode, '房主');
     window.location.href = 'room.html?room=' + roomCode;
 
   } catch (err) {
@@ -131,6 +132,7 @@ async function joinRoom() {
 
     if (res.data.status === 'playing') {
       // 游戏已开始，跳转到游戏页（重新加入）
+      saveRoomHistory(code, '');
       window.location.href = 'game.html?room=' + code;
       return;
     }
@@ -142,7 +144,8 @@ async function joinRoom() {
       return;
     }
 
-    // 跳转房间页
+    // 保存房间历史并跳转
+    saveRoomHistory(code, getStoredNickname() || '玩家');
     window.location.href = 'room.html?room=' + code;
 
   } catch (err) {
