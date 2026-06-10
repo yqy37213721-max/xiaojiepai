@@ -167,6 +167,15 @@ function renderAll(gs) {
     ti.innerHTML = '⏳ 轮到: <strong>' + curName + '</strong>';
   }
 
+  // 跳过按钮（玩家离线时显示）
+  var skipBtn = document.getElementById('skipBtn');
+  if (!isMyTurn && curPlayer && !curPlayer.is_online && gs.current_index < total) {
+    skipBtn.style.display = 'flex';
+    skipBtn.textContent = '⏭️ 跳过 ' + curName + '（离线）';
+  } else {
+    skipBtn.style.display = 'none';
+  }
+
   // 抽牌按钮
   var btn = $('drawBtn');
   if (isMyTurn && gs.current_index < total) {
@@ -451,6 +460,49 @@ async function drawCard() {
   }
 
   isDrawing = false;
+}
+
+
+// =====================================================
+// 跳过离线玩家的回合
+// =====================================================
+async function skipTurn() {
+  if (!gameState) return;
+  var gs = gameState;
+  var turnOrder = gs.turn_order || [];
+  if (turnOrder.length < 2) return;
+  
+  var ti = (gs.current_turn_index || 0);
+  var nextTi = (ti + 1) % turnOrder.length;
+  var nextTurn = turnOrder[nextTi];
+  
+  // 确认跳过
+  var curPlayer = getPlayerBySeat(gs.current_turn);
+  var curName = curPlayer ? curPlayer.nickname : '#' + gs.current_turn;
+  if (!confirm('确定跳过 ' + curName + ' 的回合吗？他将失去抽牌机会。')) return;
+  
+  try {
+    var res = await supabase
+      .from('game_state')
+      .update({
+        current_turn: nextTurn,
+        current_turn_index: nextTi,
+        updated_at: new Date().toISOString()
+      })
+      .eq('room_id', roomId)
+      .eq('current_turn_index', ti)
+      .select();
+    
+    if (res.data && res.data[0]) {
+      showToast('⏭️ 已跳过 ' + curName + '，轮到下一位', false);
+      document.getElementById('skipBtn').style.display = 'none';
+    } else {
+      showToast('状态已变更，请刷新重试', true);
+    }
+  } catch(err) {
+    console.error('skipTurn error:', err);
+    showToast('跳过失败：' + (err.message || '未知错误'), true);
+  }
 }
 
 // 点击卡牌背面 = 抽牌
