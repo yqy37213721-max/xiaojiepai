@@ -145,7 +145,7 @@ async function joinRoom() {
     }
 
     // 保存房间历史并跳转
-    saveRoomHistory(code, getStoredNickname() || '玩家');
+    saveRoomHistory(code, '');
     window.location.href = 'room.html?room=' + code;
 
   } catch (err) {
