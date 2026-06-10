@@ -351,9 +351,9 @@ async function createRoom(name) {
   const init = { players: [name], idx: 0, started: false, mode: "", wheel: { hist: [] }, card: { deck: [], hist: [] }, backup: { mode: "truth", hist: [] } };
   init.card.deck = createDeck();
   const { error: e1 } = await _supabase.from("rooms").insert({ room_id: code, state: init, host_id: pid, created_at: new Date().toISOString() });
-  if (e1) { toast("创建失败", 1); return null; }
+  if (e1) { console.error("rooms error:", e1); toast("创建失败", 1); return null; } return null; }
   const { error: e2 } = await _supabase.from("players").insert({ room_id: code, player_id: pid, player_name: name, is_host: true });
-  if (e2) { toast("创建失败", 1); return null; }
+  if (e2) { console.error("players error:", e2); toast("创建失败", 1); return null; } return null; }
   g = { ...g, roomId: code, pid, name, isHost: true, state: init, curAngle: 0 };
   drawWheel(0);
   localStorage.setItem(PFX + "name", name); localStorage.setItem(PFX + "pid", pid);
