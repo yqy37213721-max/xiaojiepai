@@ -129,8 +129,13 @@ async function joinRoom() {
       return;
     }
 
-    if (res.data.status !== 'waiting') {
-      showToast('游戏已开始，无法加入', true);
+    if (res.data.status === 'playing') {
+      // 游戏已开始，跳转到游戏页（重新加入）
+      window.location.href = 'game.html?room=' + code;
+      return;
+    }
+    if (res.data.status === 'finished') {
+      showToast('该房间游戏已结束', true);
       btn.disabled = false;
       btn.textContent = '加入房间';
       isProcessing = false;
