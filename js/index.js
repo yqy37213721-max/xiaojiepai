@@ -4,6 +4,13 @@
 
 let isProcessing = false;
 
+// 获取存储的昵称
+function getStoredNickname() {
+  try {
+    return localStorage.getItem('nickname') || '';
+  } catch(e) { return ''; }
+}
+
 // Toast 提示
 function showToast(msg, isError) {
   var el = document.getElementById('toast');
