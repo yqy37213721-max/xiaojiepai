@@ -479,7 +479,7 @@ async function skipTurn() {
   // 确认跳过
   var curPlayer = getPlayerBySeat(gs.current_turn);
   var curName = curPlayer ? curPlayer.nickname : '#' + gs.current_turn;
-  if (!confirm('确定跳过 ' + curName + ' 的回合吗？他将失去抽牌机会。')) return;
+  if (!confirm('跳过 ' + curName + ' 的回合？')) return;
   
   try {
     var res = await supabase
