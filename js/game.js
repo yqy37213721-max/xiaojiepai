@@ -167,11 +167,11 @@ function renderAll(gs) {
     ti.innerHTML = '⏳ 轮到: <strong>' + curName + '</strong>';
   }
 
-  // 跳过按钮（玩家离线时显示）
+  // 跳过按钮（非自己回合时始终显示）
   var skipBtn = document.getElementById('skipBtn');
-  if (!isMyTurn && curPlayer && !curPlayer.is_online && gs.current_index < total) {
+  if (!isMyTurn && gs.current_index < total && gs.turn_order && gs.turn_order.length > 1) {
     skipBtn.style.display = 'flex';
-    skipBtn.textContent = '⏭️ 跳过 ' + curName + '（离线）';
+    skipBtn.textContent = '⏭️ 跳过 ' + curName;
   } else {
     skipBtn.style.display = 'none';
   }
@@ -479,7 +479,7 @@ async function skipTurn() {
   // 确认跳过
   var curPlayer = getPlayerBySeat(gs.current_turn);
   var curName = curPlayer ? curPlayer.nickname : '#' + gs.current_turn;
-  if (!confirm('跳过 ' + curName + ' 的回合？')) return;
+  if (!confirm('跳过 ' + curName + ' 的回合吗？')) return;
   
   try {
     var res = await supabase
