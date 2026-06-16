@@ -1,5 +1,5 @@
 ﻿// =====================================================
-// 首页逻辑 - 创建/加入房间
+// 首页逻辑 - 创建/加入房间 + 观战入口
 // =====================================================
 
 let isProcessing = false;
@@ -46,7 +46,7 @@ function getPlayerUuid() {
   return uuid;
 }
 
-// 创建房间
+// 创建房间（增加 is_spectatable 字段）
 async function createRoom() {
   if (isProcessing) return;
   isProcessing = true;
@@ -59,10 +59,10 @@ async function createRoom() {
     // 1. 生成唯一房间码
     var roomCode = await generateRoomCode();
 
-    // 2. 创建房间
+    // 2. 创建房间（默认允许观战）
     var res = await supabase
       .from('rooms')
-      .insert({ room_code: roomCode, status: 'waiting' })
+      .insert({ room_code: roomCode, status: 'waiting', is_spectatable: true })
       .select()
       .single();
 
@@ -120,10 +120,10 @@ async function joinRoom() {
   btn.textContent = '加入中...';
 
   try {
-    // 查询房间是否存在
+    // 查询房间是否存在及状态
     var res = await supabase
       .from('rooms')
-      .select('id, status')
+      .select('id, status, is_spectatable')
       .eq('room_code', code)
       .maybeSingle();
 
@@ -138,9 +138,11 @@ async function joinRoom() {
     }
 
     if (res.data.status === 'playing') {
-      // 游戏已开始，跳转到游戏页（重新加入）
-      saveRoomHistory(code, '');
-      window.location.href = 'game.html?room=' + code;
+      // 游戏已开始，显示观战入口
+      showSpectatorBanner(code);
+      btn.disabled = false;
+      btn.textContent = '加入房间';
+      isProcessing = false;
       return;
     }
     if (res.data.status === 'finished') {
@@ -163,3 +165,43 @@ async function joinRoom() {
     isProcessing = false;
   }
 }
+
+// 显示观战入口横幅
+function showSpectatorBanner(code) {
+  var banner = document.getElementById('spectatorBanner');
+  if (banner) {
+    banner.style.display = 'block';
+    // 在 URL 中记录当前房间号
+    var url = new URL(window.location.href);
+    url.searchParams.set('room', code);
+    window.history.replaceState({}, '', url);
+  }
+}
+
+// 加入观战（ live ）
+function liveWatch() {
+  var url = new URL(window.location.href);
+  var room = url.searchParams.get('room');
+  if (room) {
+    window.location.href = 'spectator.html?room=' + room;
+  }
+}
+
+// 作为玩家加入（进入房间页）
+function joinAsPlayer() {
+  var url = new URL(window.location.href);
+  var room = url.searchParams.get('room');
+  if (room) {
+    window.location.href = 'room.html?room=' + room;
+  }
+}
+
+// 页面加载时检查 URL 参数
+window.addEventListener('DOMContentLoaded', function() {
+  var params = new URLSearchParams(window.location.search);
+  var room = params.get('room');
+  if (room) {
+    var input = document.getElementById('roomCodeInput');
+    if (input) input.value = room;
+  }
+});

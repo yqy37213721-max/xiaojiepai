@@ -1,5 +1,6 @@
 ﻿// =====================================================
 // 小姐牌 - 完整游戏逻辑 [规则已按你的描述更新]
+// 新增：抽牌顺序显示、游戏途中加入、观战模式
 // =====================================================
 
 // ---- 卡牌规则表 ----
@@ -35,12 +36,13 @@ var gameState = null;
 var isMyTurn = false;
 var isDrawing = false;
 var historyOpen = false;
+var isSpectator = false;
 
 // ---- DOM 缓存 ----
 var $ = function(id) { return document.getElementById(id); };
 
 function showToast(msg, isErr) {
-  var el = $('toast');
+  var el = toast;
   el.textContent = msg;
   el.className = 'toast show' + (isErr ? ' error' : '');
   clearTimeout(el._timer);
@@ -92,12 +94,19 @@ function getPlayerBySeat(seat) {
   return null;
 }
 
+function getPlayerByUuid(uuid) {
+  for (var i = 0; i < players.length; i++) {
+    if (players[i].player_uuid === uuid) return players[i];
+  }
+  return null;
+}
+
 // ---- 离开 ----
 function exitGame() {
-  if (!confirm('确定退出游戏吗？')) return;
+  if (!isSpectator && !confirm('确定退出游戏吗？')) return;
   RealtimeManager.unsubscribe();
   // 标记离线
-  if (roomId && currentPlayerUuid) {
+  if (roomId && currentPlayerUuid && !isSpectator) {
     supabase
       .from('players')
       .update({ is_online: false, updated_at: new Date().toISOString() })
@@ -109,90 +118,298 @@ function exitGame() {
   window.location.href = 'index.html';
 }
 
-function toggleHistory() {
-  historyOpen = !historyOpen;
-  var el = $('historyList');
-  el.className = 'history-list' + (historyOpen ? ' open' : '');
+// ---- 进入观战 ----
+function joinAsSpectator() {
+  window.location.href = 'spectator.html?room=' + roomCode;
 }
 
-// =====================================================
-// 更新特殊状态
-// =====================================================
-function computeSpecialStates(prev, card, seatNum) {
-  var s = {};
-  s.miss = prev && prev.miss ? prev.miss : null;
-  s.camera = prev ? !!prev.camera : false;
-  s.crazy = prev && prev.crazy ? prev.crazy : null;
-  s.toilet = prev && prev.toilet ? prev.toilet : null;
-
-  switch (card.value) {
-    case '2':
-      s.miss = seatNum;
-      break;
-    case '5':
-      s.camera = true;
-      break;
-    case '10':
-      s.crazy = seatNum;
-      break;
-    case '8':
-      s.toilet = seatNum;
-      break;
+// ---- 分享 ----
+function shareGame() {
+  var url = window.location.origin + '/game.html?room=' + roomCode;
+  if (navigator.share) {
+    navigator.share({
+      title: '小姐牌 - 微信群喝酒小游戏',
+      text: '一起来玩小姐牌！房间号: ' + roomCode,
+      url: url
+    }).catch(function(){});
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = url;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('链接已复制，发送到微信群即可');
   }
-  return s;
 }
 
 // =====================================================
-// 渲染完整 UI
+// 渲染函数
 // =====================================================
+
+// ---- 渲染抽牌顺序 ----
+function renderTurnOrder(turnOrder, currentTurnIndex, drawnCards) {
+  var listEl = turnOrderList;
+  if (!turnOrder || !Array.isArray(turnOrder) || turnOrder.length === 0) {
+    listEl.innerHTML = '<div style="text-align:center;padding:12px;color:rgba(255,255,255,0.3);font-size:13px;">等待游戏开始...</div>';
+    return;
+  }
+
+  var html = '';
+  var drawnCount = drawnCards ? drawnCards.length : 0;
+
+  for (var i = 0; i < turnOrder.length; i++) {
+    var seat = turnOrder[i];
+    var player = getPlayerBySeat(seat);
+    if (!player) continue;
+
+    var isActive = (i === currentTurnIndex);
+    var isSeen = (i < currentTurnIndex);
+    var isMe = (player.player_uuid === currentPlayerUuid);
+    
+    var classes = 'turn-order-item';
+    if (isActive) classes += ' active';
+    if (isMe && !isActive) classes += ' is-my-turn';
+    if (isSeen) classes += ' seen';
+    if (!player.is_online) classes += ' offline';
+
+    var statusText = '';
+    if (isActive) statusText = '<span class="drawing-indicator">🔄 正在抽牌</span>';
+    else if (!player.is_online) statusText = '<span class="offline-indicator">💤 离线</span>';
+
+    var badges = '';
+    if (isMe) badges += '<span class="badge my">我</span>';
+    if (player.cards_drawn && player.cards_drawn > 0) badges += '<span class="badge cards">' + player.cards_drawn + '张</span>';
+    if (player.drinks_count && player.drinks_count > 0) badges += '<span class="badge drinks">' + player.drinks_count + '杯</span>';
+
+    html += '<div class="' + classes + '">';
+    html += '  <span class="seq">' + (i + 1) + '.</span>';
+    html += '  <span class="name">' + escapeHtml(player.nickname) + '</span>';
+    html += '  ' + statusText;
+    html += '  ' + badges;
+    html += '</div>';
+  }
+
+  // 显示已在游戏中但不在 turn_order 中的玩家（等待加入）
+  var inTurnSeats = {};
+  for (var t = 0; t < turnOrder.length; t++) {
+    inTurnSeats[turnOrder[t]] = true;
+  }
+  var waitingPlayers = [];
+  for (var p = 0; p < players.length; p++) {
+    if (!inTurnSeats[players[p].seat_number] && players[p].is_online) {
+      waitingPlayers.push(players[p]);
+    }
+  }
+  if (waitingPlayers.length > 0) {
+    html += '<div class="waiting-separator">⏳ 等待加入</div>';
+    for (var w = 0; w < waitingPlayers.length; w++) {
+      var wp = waitingPlayers[w];
+      var wMe = (wp.player_uuid === currentPlayerUuid);
+      html += '<div class="turn-order-item waiting">';
+      html += '  <span class="seq">-</span>';
+      html += '  <span class="name">' + escapeHtml(wp.nickname) + '</span>';
+      if (wMe) html += '<span class="badge my">我</span>';
+      html += '  <span class="waiting-indicator">等待加入...</span>';
+      html += '</div>';
+    }
+  }
+
+  listEl.innerHTML = html;
+}
+
+// ---- 渲染特殊状态 ----
+function renderStates(states) {
+  var bar = statesBar;
+  if (!states || !Object.keys(states).length) {
+    bar.innerHTML = '';
+    return;
+  }
+  var html = '';
+  var stateLabels = {
+    miss: { emoji: '👩', label: '小姐: ' },
+    camera: { emoji: '📸', label: '照相机活跃' },
+    crazy: { emoji: '🤪', label: '神经病: ' },
+    toilet: { emoji: '🚽', label: '厕所许可证' }
+  };
+  for (var key in states) {
+    if (states[key] === null || states[key] === false) continue;
+    var cfg = stateLabels[key];
+    if (!cfg) continue;
+    var target = '';
+    if (typeof states[key] === 'number') {
+      var p = getPlayerBySeat(states[key]);
+      target = p ? p.nickname : '玩家';
+    } else {
+      target = '活跃';
+    }
+    html += '<div class=\"state-tag\">' + cfg.emoji + ' ' + cfg.label + target + '</div>';
+  }
+  bar.innerHTML = html;
+}
+
+// ---- 渲染历史 ----
+function renderHistory(drawn) {
+  var listEl = historyList;
+  var labelEl = histLabel;
+  
+  if (!drawn || drawn.length === 0) {
+    listEl.innerHTML = '<div style=\"text-align:center;padding:12px;color:rgba(255,255,255,0.2);font-size:12px;\">暂无记录</div>';
+    labelEl.textContent = '抽牌记录 (0)';
+    return;
+  }
+
+  var html = '';
+  for (var i = drawn.length - 1; i >= 0; i--) {
+    var card = drawn[i];
+    var rule = CARD_RULES[card.value] || { name: '?', emoji: '❓' };
+    var disp = getCardDisplay(card);
+    var cardText = disp.isJoker ? disp.symbol + disp.suit : disp.symbol + disp.suit;
+    
+    html += '<div class=\"history-item\">';
+    html += '  <span class=\"h-seq\">' + (i + 1) + '.</span>';
+    html += '  <span class=\"h-card\" style=\"color:' + disp.color + ';\">' + cardText + '</span>';
+    html += '  <span class=\"h-rule\">' + rule.emoji + ' ' + rule.name + '</span>';
+    html += '</div>';
+  }
+  
+  listEl.innerHTML = html;
+  labelEl.textContent = '抽牌记录 (' + drawn.length + ')';
+}
+
+// ---- 渲染游戏结束 ----
+function renderEndModal(gs) {
+  var modal = endModal;
+  var drawn = gs.drawn_cards || [];
+  var highlights = endHighlights;
+  var stats = endStats;
+
+  // 统计
+  var statsHtml = '';
+  for (var i = 0; i < players.length; i++) {
+    var p = players[i];
+    var badges = '';
+    if (p.player_uuid === currentPlayerUuid) badges = ' <span style=\"color:#60a5fa;\">(我)</span>';
+    statsHtml += '<div class=\"end-player\">';
+    statsHtml += '  <div class=\"ep-name\">' + escapeHtml(p.nickname) + badges + '</div>';
+    statsHtml += '  <div class=\"ep-stat\">';
+    statsHtml += '    抽牌: <strong>' + (p.cards_drawn || 0) + '</strong> 张 | ';
+    statsHtml += '    喝酒: <strong>' + (p.drinks_count || 0) + '</strong> 杯';
+    statsHtml += '  </div>';
+    statsHtml += '</div>';
+  }
+  stats.innerHTML = statsHtml;
+
+  // 亮点
+  var missSeat = gs.special_states && gs.special_states.miss;
+  var missName = missSeat ? getPlayerBySeat(missSeat) : null;
+  var highlightsHtml = '';
+  if (missName) highlightsHtml += '<div class=\"end-hl\">👩 最终小姐: ' + escapeHtml(missName.nickname) + '</div>';
+  if (drawn.length > 0) {
+    var lastCard = drawn[drawn.length - 1];
+    var rule = CARD_RULES[lastCard.value] || { name: '?' };
+    highlightsHtml += '<div class=\"end-hl\">🃏 最后一张牌: ' + rule.emoji + ' ' + rule.name + '</div>';
+  }
+  highlights.innerHTML = highlightsHtml;
+
+  modal.classList.add('show');
+}
+
+function closeEndModal() {
+  endModal.classList.remove('show');
+}
+
+function playAgain() {
+  closeEndModal();
+  // TODO: 重新开始游戏
+  showToast('功能开发中...', false);
+}
+
+// ---- 渲染所有 ----
 function renderAll(gs) {
-  if (!gs) return;
   gameState = gs;
 
   // 轮次
-  var total = (gs.card_pile || []).length;
-  $('roundNum').textContent = gs.current_index;
-  $('totalCards').textContent = total;
+  roundNum.textContent = gs.current_index;
+  totalCards.textContent = gs.card_pile ? gs.card_pile.length : 54;
 
-  // 当前轮到谁
-  var curSeat = gs.current_turn;
-  var curPlayer = getPlayerBySeat(curSeat);
-  var curName = curPlayer ? curPlayer.nickname : ('#' + curSeat);
-  isMyTurn = (curSeat === mySeat);
+  // 当前玩家
+  var currentPlayer = getPlayerBySeat(gs.current_turn);
+  turnPlayer.textContent = currentPlayer ? currentPlayer.nickname : '玩家 ' + gs.current_turn;
 
-  var ti = $('turnIndicator');
-  if (isMyTurn) {
-    ti.innerHTML = '🎯 轮到你了，<strong class="is-me">' + curName + '</strong>';
+  // 判断是否轮到我
+  isMyTurn = (currentPlayer && currentPlayer.player_uuid === currentPlayerUuid);
+  
+  // 抽牌按钮显示
+  var drawBtn = drawBtn;
+  if (isMyTurn && !isDrawing && !isSpectator) {
+    drawBtn.style.display = 'block';
+    backHint.textContent = '轮到你了！点击抽牌';
   } else {
-    ti.innerHTML = '⏳ 轮到: <strong>' + curName + '</strong>';
+    drawBtn.style.display = 'none';
+    if (isSpectator) {
+      backHint.textContent = '观战模式';
+    } else {
+      backHint.textContent = '等待抽牌...';
+    }
   }
 
-  // 跳过按钮（非自己回合时始终显示）
-  var skipBtn = document.getElementById('skipBtn');
-  if (!isMyTurn && gs.current_index < total && gs.turn_order && gs.turn_order.length > 1) {
-    skipBtn.style.display = 'flex';
-    skipBtn.textContent = '⏭️ 跳过 ' + curName;
+  // 跳过按钮显示
+  var skipBtn = skipBtn;
+  if (!isMyTurn && !isSpectator && currentPlayer && !currentPlayer.is_online) {
+    skipBtn.style.display = 'inline-block';
   } else {
     skipBtn.style.display = 'none';
   }
 
-  // 抽牌按钮
-  var btn = $('drawBtn');
-  if (isMyTurn && gs.current_index < total) {
-    btn.style.display = 'flex';
-    btn.disabled = false;
-    btn.textContent = '抽牌 🃏';
-  } else {
-    btn.style.display = 'none';
-  }
-
-  // 如果已抽过牌，显示最后一张
+  // 卡牌显示
   var drawn = gs.drawn_cards || [];
   if (drawn.length > 0) {
-    var last = drawn[drawn.length - 1];
-    showCard(last.card, last.seat_number);
+    var lastCard = drawn[drawn.length - 1];
+    var disp = getCardDisplay(lastCard);
+    var rule = CARD_RULES[lastCard.value] || { name: '?', emoji: '❓' };
+
+    // 显示正面
+    var wrapper = cardWrapper;
+    wrapper.classList.add('flipped');
+
+    var front = cardFront;
+    front.style.color = disp.color;
+
+    if (disp.isJoker) {
+      cJoker.textContent = disp.symbol;
+      cJoker.style.display = 'block';
+      cValue.textContent = '';
+      cSuit.textContent = disp.suit;
+    } else {
+      cJoker.style.display = 'none';
+      cJoker.textContent = '';
+      cValue.textContent = disp.symbol;
+      cSuit.textContent = disp.suit;
+    }
+
+    // 规则
+    rEmoji.textContent = rule.emoji;
+    rEmoji.className = 'r-emoji show';
+    rName.textContent = rule.name;
+    rName.className = 'r-name show';
+    rDesc.textContent = rule.desc;
+    rDesc.className = 'r-desc show';
+    
+    // 显示抽牌者
+    var drawer = getPlayerBySeat(gs.current_turn);
+    cardWho.textContent = drawer ? (drawer.nickname + ' 抽了 ' + rule.name) : '';
+    rWho.textContent = '由 ' + (drawer ? drawer.nickname : '玩家') + ' 抽出';
+    rWho.className = 'r-who show';
   } else {
-    resetCardDisplay();
+    // 还未抽牌，显示背面
+    cardWrapper.classList.remove('flipped');
+    rEmoji.className = 'r-emoji';
+    rName.className = 'r-name';
+    rDesc.className = 'r-desc';
+    rWho.className = 'r-who';
   }
 
   // 特殊状态
@@ -201,532 +418,248 @@ function renderAll(gs) {
   // 历史
   renderHistory(drawn);
 
-  // 牌堆耗尽或游戏结束
-  if ((gs.current_index >= total && total > 0) || gs.status === 'finished') {
-    if (!window._gameEndShown) {
-      window._gameEndShown = true;
-      $('drawBtn').style.display = 'none';
-      $('turnIndicator').innerHTML = '🎉 游戏结束！';
-      // 更新房间状态（牌抽完了自动结算）
-      if (gs.current_index >= total && total > 0 && gs.status !== 'finished') {
-        supabase.from('rooms').update({ status:'finished', updated_at:new Date().toISOString() }).eq('id', roomId).then(function(){}).catch(function(){});
-      }
-      showEndScreen(gs);
-    }
-  } else {
-    window._gameEndShown = false;
+  // 抽牌顺序
+  renderTurnOrder(gs.turn_order, gs.current_turn_index || 0, drawn);
+
+  // 游戏结束检测
+  if (drawn.length >= 54 && gs.status === 'playing') {
+    gs.status = 'finished';
+    renderEndModal(gs);
   }
-}
-
-function resetCardDisplay() {
-  var w = $('cardWrapper');
-  w.className = 'card-wrapper';
-  $('backHint').textContent = '等待抽牌...';
-  $('rEmoji').className = 'r-emoji';
-  $('rName').className = 'r-name';
-  $('rDesc').className = 'r-desc';
-  $('rWho').className = 'r-who';
-}
-
-function showCard(card, seatNum) {
-  var disp = getCardDisplay(card);
-  var rule = getCardRule(card);
-  var player = getPlayerBySeat(seatNum);
-  var playerName = player ? player.nickname : '#' + seatNum;
-
-  // 正面填充
-  if (disp.isJoker) {
-    $('cJoker').textContent = disp.suit;
-    $('cJoker').style.display = 'block';
-    $('cValue').style.display = 'none';
-    $('cSuit').style.display = 'none';
-  } else {
-    $('cJoker').style.display = 'none';
-    $('cValue').style.display = 'block';
-    $('cSuit').style.display = 'block';
-    $('cValue').textContent = disp.symbol;
-    $('cValue').style.color = disp.color;
-    $('cSuit').textContent = disp.suit;
-    $('cSuit').style.color = disp.color;
-  }
-  $('cardWho').textContent = playerName + ' 抽到';
-
-  // 翻转
-  var w = $('cardWrapper');
-  w.className = 'card-wrapper flipped';
-
-  // 规则
-  $('rEmoji').textContent = rule.emoji;
-  $('rEmoji').className = 'r-emoji show';
-  $('rName').textContent = rule.name;
-  $('rName').className = 'r-name show';
-  $('rDesc').textContent = rule.desc;
-  $('rDesc').className = 'r-desc show';
-
-  // 补充说明：左右喝时显示谁
-  var extra = '';
-  if (card.value === 'J' || card.value === 'j') {
-    var leftSeat = getLeftPlayer(seatNum);
-    var leftP = getPlayerBySeat(leftSeat);
-    extra = '👈 左边: ' + (leftP ? leftP.nickname : '#' + leftSeat) + ' 喝 1 杯！';
-  } else if (card.value === 'Q' || card.value === 'q') {
-    var rightSeat = getRightPlayer(seatNum);
-    var rightP = getPlayerBySeat(rightSeat);
-    extra = '👉 右边: ' + (rightP ? rightP.nickname : '#' + rightSeat) + ' 喝 1 杯！';
-  } else if (card.value === '9') {
-    extra = '🍺 ' + playerName + ' 自罚 1 杯！';
-  } else if (card.value === 'A') {
-    extra = '👑 ' + playerName + ' 获得命令牌，指定任意一人喝 1 杯！';
-  } else if (card.value === '2') {
-    extra = '👩 ' + playerName + ' 现在是小姐！谁喝酒都可喊她陪喝！';
-  } else if (card.value === '10') {
-    extra = '🤪 ' + playerName + ' 现在是神经病！谁跟他说话谁喝酒！';
-  }
-
-  if (extra) {
-    $('rWho').textContent = extra;
-    $('rWho').className = 'r-who show';
-  } else {
-    $('rWho').className = 'r-who';
-  }
-}
-
-function getLeftPlayer(seat) {
-  var seats = (gameState.turn_order || []).slice();
-  var idx = seats.indexOf(seat);
-  if (idx <= 0) return seats[seats.length - 1];
-  return seats[idx - 1];
-}
-
-function getRightPlayer(seat) {
-  var seats = (gameState.turn_order || []).slice();
-  var idx = seats.indexOf(seat);
-  if (idx >= seats.length - 1) return seats[0];
-  return seats[idx + 1];
-}
-
-// ---- 特殊状态渲染 ----
-function renderStates(ss) {
-  var bar = $('statesBar');
-  if (!ss) { bar.innerHTML = ''; return; }
-  var tags = [];
-
-  if (ss.miss != null) {
-    var p = getPlayerBySeat(ss.miss);
-    tags.push('<span class="state-tag"><span class="emoji">👩</span> 小姐: ' + (p ? p.nickname : '#' + ss.miss) + '</span>');
-  }
-  if (ss.camera) {
-    tags.push('<span class="state-tag"><span class="emoji">📸</span> 照相机生效中</span>');
-  }
-  if (ss.crazy != null) {
-    var p = getPlayerBySeat(ss.crazy);
-    tags.push('<span class="state-tag"><span class="emoji">🤪</span> 神经病: ' + (p ? p.nickname : '#' + ss.crazy) + '</span>');
-  }
-  if (ss.toilet != null) {
-    var p = getPlayerBySeat(ss.toilet);
-    tags.push('<span class="state-tag"><span class="emoji">🚽</span> 厕所: ' + (p ? p.nickname : '#' + ss.toilet) + '</span>');
-  }
-
-  bar.innerHTML = tags.join('');
-}
-
-// ---- 历史渲染 ----
-function renderHistory(drawn) {
-  var el = $('historyList');
-  if (!drawn || drawn.length === 0) {
-    el.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,0.2);padding:8px;">暂无记录</div>';
-    return;
-  }
-
-  $('histLabel').textContent = '抽牌记录 (' + drawn.length + ')';
-
-  var html = '';
-  // 显示最近20条
-  var items = drawn.slice(-20);
-  for (var i = 0; i < items.length; i++) {
-    var d = items[i];
-    var p = getPlayerBySeat(d.seat_number);
-    var cardDisp = d.card.suit === 'joker'
-      ? (d.card.value === 'small' ? '🃏小' : '🃏大')
-      : (SUIT_SYMBOLS[d.card.suit] || '') + d.card.value;
-    var name = p ? p.nickname : '#' + d.seat_number;
-    html += '<div class="history-item">'
-      + '<span class="hs">' + name + '</span>'
-      + ' 抽到 '
-      + '<span class="hn">' + cardDisp + '</span>'
-      + ' · ' + (d.rule_name || '')
-      + '</div>';
-  }
-
-  if (drawn.length > 20) {
-    html += '<div style="font-size:11px;color:rgba(255,255,255,0.15);padding:4px 8px;">仅显示最近20条</div>';
-  }
-
-  el.innerHTML = html;
 }
 
 // =====================================================
-// 抽牌
+// 游戏操作
 // =====================================================
+
+function onCardClick() {
+  if (isMyTurn && !isDrawing) {
+    drawCard();
+  }
+}
+
 async function drawCard() {
-  if (isDrawing) return;
-  if (!isMyTurn) return;
+  if (!isMyTurn || isDrawing) return;
+  if (!gameState) return;
 
-  var btn = $('drawBtn');
-  btn.disabled = true;
-  btn.textContent = '抽牌中...';
   isDrawing = true;
+  drawBtn.disabled = true;
 
   try {
-    // 1. 读取当前状态
+    var drawn = gameState.drawn_cards || [];
+    var pile = gameState.card_pile || [];
+    
+    if (pile.length <= 0) {
+      showToast('牌已抽完！', true);
+      isDrawing = false;
+      return;
+    }
+
+    // 抽牌
+    var card = pile.shift();
+    drawn.push(card);
+
+    // 计算下一个玩家
+    var turnOrder = gameState.turn_order || [];
+    var nextIndex = (gameState.current_turn_index || 0) + 1;
+    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
+
+    // 更新游戏状态
+    var updateData = {
+      card_pile: pile,
+      drawn_cards: drawn,
+      current_index: gameState.current_index + 1,
+      current_turn: nextSeat,
+      current_turn_index: nextIndex,
+      updated_at: new Date().toISOString()
+    };
+
+    // 处理特殊牌
+    var specialStates = gameState.special_states || {};
+    if (card.value === '2') {
+      specialStates.miss = gameState.current_turn;
+    } else if (card.value === '10') {
+      specialStates.crazy = gameState.current_turn;
+    }
+    updateData.special_states = specialStates;
+
     var res = await supabase
       .from('game_state')
-      .select('*')
+      .update(updateData)
       .eq('room_id', roomId)
+      .eq('current_turn_index', gameState.current_turn_index)
+      .select()
       .single();
 
     if (res.error) throw res.error;
-    var gs = res.data;
 
-    // 2. 二次验证
-    if (gs.current_turn !== mySeat) {
-      showToast('还没轮到您', true);
-      isDrawing = false;
-      btn.style.display = 'none';
-      return;
+    // 更新玩家抽牌计数
+    var me = getPlayerByUuid(currentPlayerUuid);
+    if (me) {
+      await supabase
+        .from('players')
+        .update({ 
+          cards_drawn: (me.cards_drawn || 0) + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', me.id);
     }
 
-    var deck = gs.card_pile || [];
-    var idx = gs.current_index;
-    if (idx >= deck.length) {
-      showToast('牌已抽完', true);
-      isDrawing = false;
-      btn.style.display = 'none';
-      return;
-    }
-
-    var card = deck[idx];
-    var rule = getCardRule(card);
-
-    // 3. 计算下一状态
-    var newSpecial = computeSpecialStates(gs.special_states, card, mySeat);
-    var turnOrder = gs.turn_order || [];
-    var ti = (gs.current_turn_index || 0);
-    var nextTi = (ti + 1) % turnOrder.length;
-    var nextTurn = turnOrder[nextTi];
-
-    var drawnEntry = {
-      seat_number: mySeat,
-      card: card,
-      rule_name: rule.name,
-      rule_emoji: rule.emoji,
-      drawn_at: new Date().toISOString()
-    };
-
-    var newDrawn = (gs.drawn_cards || []).slice();
-    newDrawn.push(drawnEntry);
-
-    // 4. 乐观锁更新
-    var updateRes = await supabase
-      .from('game_state')
-      .update({
-        current_index: idx + 1,
-        current_turn: nextTurn,
-        current_turn_index: nextTi,
-        drawn_cards: newDrawn,
-        special_states: newSpecial,
-        updated_at: new Date().toISOString()
-      })
-      .eq('room_id', roomId)
-      .eq('current_index', idx)
-      .select();
-
-    if (!updateRes.data || updateRes.data.length === 0) {
-      showToast('状态已变更，请重试', true);
-      btn.disabled = false;
-      btn.textContent = '抽牌 🃏';
-      isDrawing = false;
-      return;
-    }
-
-    // 本地立即更新（加速响应）
-    renderAll(updateRes.data[0]);
+    // 根据牌面处理喝酒逻辑
+    await handleCardEffect(card);
 
   } catch (err) {
     console.error('drawCard error:', err);
     showToast('抽牌失败：' + (err.message || '未知错误'), true);
-    btn.disabled = false;
-    btn.textContent = '抽牌 🃏';
+  } finally {
+    isDrawing = false;
+    drawBtn.disabled = false;
   }
-
-  isDrawing = false;
 }
 
+async function handleCardEffect(card) {
+  var rule = CARD_RULES[card.value];
+  if (!rule) return;
 
-// =====================================================
-// 跳过离线玩家的回合
-// =====================================================
+  var me = getPlayerByUuid(currentPlayerUuid);
+  if (!me) return;
+
+  try {
+    switch(card.value) {
+      case '9': // 自罚一杯
+        await supabase
+          .from('players')
+          .update({ 
+            drinks_count: (me.drinks_count || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', me.id);
+        showToast('😱 自罚一杯！');
+        break;
+      
+      case 'J': // 左边喝
+        var leftSeat = getLeftSeat(me.seat_number);
+        var leftPlayer = getPlayerBySeat(leftSeat);
+        if (leftPlayer) {
+          await supabase
+            .from('players')
+            .update({ 
+              drinks_count: (leftPlayer.drinks_count || 0) + 1,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', leftPlayer.id);
+          showToast('👈 ' + leftPlayer.nickname + ' 喝 1 杯！');
+        }
+        break;
+      
+      case 'Q': // 右边喝
+        var rightSeat = getRightSeat(me.seat_number);
+        var rightPlayer = getPlayerBySeat(rightSeat);
+        if (rightPlayer) {
+          await supabase
+            .from('players')
+            .update({ 
+              drinks_count: (rightPlayer.drinks_count || 0) + 1,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', rightPlayer.id);
+          showToast('👉 ' + rightPlayer.nickname + ' 喝 1 杯！');
+        }
+        break;
+      
+      case 'K': // 自定规矩 - 自罚
+        await supabase
+          .from('players')
+          .update({ 
+            drinks_count: (me.drinks_count || 0) + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', me.id);
+        showToast('📜 自罚一杯并定规矩！');
+        break;
+      
+      case 'small_joker': // 小王
+        showToast('🃏 小王！指定一人喝 1 杯');
+        break;
+      
+      case 'big_joker': // 大王
+        showToast('🃏 大王！指定一人喝 2 杯');
+        break;
+    }
+  } catch (err) {
+    console.error('handleCardEffect error:', err);
+  }
+}
+
+function getLeftSeat(seat) {
+  if (gameState && gameState.turn_order && gameState.turn_order.length > 0) {
+    var order = gameState.turn_order;
+    var idx = order.indexOf(seat);
+    if (idx >= 0) return idx < order.length - 1 ? order[idx + 1] : order[0];
+  }
+  // fallback: 按玩家座位号排序
+  if (!players || players.length === 0) return seat;
+  var sortedSeats = players.map(function(p) { return p.seat_number; }).sort(function(a, b) { return a - b; });
+  var idx = sortedSeats.indexOf(seat);
+  return idx >= 0 && idx < sortedSeats.length - 1 ? sortedSeats[idx + 1] : sortedSeats[0];
+}
+
+function getRightSeat(seat) {
+  if (gameState && gameState.turn_order && gameState.turn_order.length > 0) {
+    var order = gameState.turn_order;
+    var idx = order.indexOf(seat);
+    if (idx >= 0) return idx > 0 ? order[idx - 1] : order[order.length - 1];
+  }
+  // fallback: 按玩家座位号排序
+  if (!players || players.length === 0) return seat;
+  var sortedSeats = players.map(function(p) { return p.seat_number; }).sort(function(a, b) { return a - b; });
+  var idx = sortedSeats.indexOf(seat);
+  return idx > 0 ? sortedSeats[idx - 1] : sortedSeats[sortedSeats.length - 1];
+}
+
 async function skipTurn() {
   if (!gameState) return;
-  var gs = gameState;
-  var turnOrder = gs.turn_order || [];
-  if (turnOrder.length < 2) return;
-  
-  var ti = (gs.current_turn_index || 0);
-  var nextTi = (ti + 1) % turnOrder.length;
-  var nextTurn = turnOrder[nextTi];
-  
-  // 确认跳过
-  var curPlayer = getPlayerBySeat(gs.current_turn);
-  var curName = curPlayer ? curPlayer.nickname : '#' + gs.current_turn;
-  if (!confirm('跳过 ' + curName + ' 的回合吗？')) return;
   
   try {
-    var res = await supabase
+    var nextIndex = (gameState.current_turn_index || 0) + 1;
+    var turnOrder = gameState.turn_order || [];
+    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
+
+    await supabase
       .from('game_state')
       .update({
-        current_turn: nextTurn,
-        current_turn_index: nextTi,
+        current_turn: nextSeat,
+        current_turn_index: nextIndex,
         updated_at: new Date().toISOString()
       })
       .eq('room_id', roomId)
-      .eq('current_turn_index', ti)
-      .select();
-    
-    if (res.data && res.data[0]) {
-      showToast('⏭️ 已跳过 ' + curName + '，轮到下一位', false);
-      document.getElementById('skipBtn').style.display = 'none';
-    } else {
-      showToast('状态已变更，请刷新重试', true);
-    }
-  } catch(err) {
-    console.error('skipTurn error:', err);
-    showToast('跳过失败：' + (err.message || '未知错误'), true);
-  }
-}
+      .eq('current_turn_index', gameState.current_turn_index);
 
-// 点击卡牌背面 = 抽牌
-function onCardClick() {
-  if (isMyTurn) drawCard();
-}
-
-// =====================================================
-// 分享房间链接
-// =====================================================
-function shareGame() {
-  var url = window.location.href;
-  if (navigator.share) {
-    navigator.share({
-      title: '小姐牌 - 微信群喝酒小游戏',
-      text: '快来一起玩小姐牌！房间号: ' + roomCode,
-      url: url
-    }).catch(function(){});
-  } else {
-    copyToClipboard(url);
-    showToast('链接已复制，发送到微信群即可邀请好友');
-  }
-}
-
-function copyToClipboard(text) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(function(){
-      fallbackCopy(text);
-    });
-  } else {
-    fallbackCopy(text);
-  }
-}
-
-function fallbackCopy(text) {
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  document.execCommand('copy');
-  document.body.removeChild(ta);
-}
-
-// =====================================================
-// 游戏结束 - 结算统计
-// =====================================================
-function showEndScreen(gs) {
-  var drawn = gs.drawn_cards || [];
-  if (drawn.length === 0) return;
-
-  // 计算每位玩家的统计数据
-  var stats = {};
-  var seatNames = {};
-  for (var i = 0; i < players.length; i++) {
-    var seat = players[i].seat_number;
-    stats[seat] = { total:0, A:0, '2':0, '5':0, '8':0, '10':0, J:0, Q:0, K:0, '9':0, joker:0 };
-    seatNames[seat] = players[i].nickname;
-  }
-
-  for (var i = 0; i < drawn.length; i++) {
-    var d = drawn[i];
-    var s = d.seat_number;
-    if (!stats[s]) continue;
-    stats[s].total++;
-    var v = d.card.value;
-    if (v === 'small_joker' || v === 'big_joker') {
-      stats[s].joker++;
-    } else if (stats[s][v] !== undefined) {
-      stats[s][v]++;
-    }
-  }
-
-  // 找到"酒王"（抽到最多9的人）
-  var maxDrink = 0, drinkKing = null;
-  for (var s in stats) {
-    if (stats[s]['9'] > maxDrink) {
-      maxDrink = stats[s]['9'];
-      drinkKing = s;
-    }
-  }
-
-  // 找到抽最多牌的人
-  var maxDraw = 0, drawKing = null;
-  for (var s in stats) {
-    if (stats[s].total > maxDraw) {
-      maxDraw = stats[s].total;
-      drawKing = s;
-    }
-  }
-
-  var order = gs.turn_order || [];
-  var html = '<div class="end-overlay" id="endOverlay">';
-  html += '<div class="end-box">';
-  html += '<div class="end-close" onclick="closeEndScreen()">✕</div>';
-  html += '<div class="end-title">🎉 游戏结束 🎉</div>';
-  html += '<div class="end-sub">共 ' + drawn.length + ' 轮</div>';
-
-  // 趣味称号
-  var titles = [];
-  if (drinkKing != null) {
-    var dkName = (getPlayerBySeat(parseInt(drinkKing)) || {}).nickname || '#' + drinkKing;
-    titles.push('🍺 酒王: ' + dkName + ' (喝了' + maxDrink + '杯)');
-  }
-  if (drawKing != null) {
-    var dkName2 = (getPlayerBySeat(parseInt(drawKing)) || {}).nickname || '#' + drawKing;
-    titles.push('🃏 手气最佳: ' + dkName2 + ' (抽了' + maxDraw + '张)');
-  }
-
-  html += '<div class="end-highlights">';
-  for (var t = 0; t < titles.length; t++) {
-    html += '<div class="end-hl">' + titles[t] + '</div>';
-  }
-  html += '</div>';
-
-  // 各玩家详情
-  html += '<div class="end-stats">';
-  for (var i = 0; i < order.length; i++) {
-    var seat = order[i];
-    var p = getPlayerBySeat(seat);
-    var s = stats[seat] || { total:0 };
-    var name = p ? p.nickname : '#' + seat;
-    html += '<div class="end-player">';
-    html += '<div class="ep-name">' + name + '</div>';
-    html += '<div class="ep-stat">抽了 <strong>' + s.total + '</strong> 张牌';
-    if (s.A > 0) html += ' · 👑命令牌×' + s.A;
-    if (s['2'] > 0) html += ' · 👩小姐牌×' + s['2'];
-    if (s['5'] > 0) html += ' · 📸相机×' + s['5'];
-    if (s['8'] > 0) html += ' · 🚽厕所×' + s['8'];
-    if (s['10'] > 0) html += ' · 🤪神经×' + s['10'];
-    if (s['9'] > 0) html += ' · 🍺喝×' + s['9'];
-    if (s.joker > 0) html += ' · 🃏王×' + s.joker;
-    if (s.J > 0 || s.Q > 0 || s.K > 0) html += ' · 指人' + (s.J + s.Q + s.K) + '次';
-    html += '</div></div>';
-  }
-  html += '</div>';
-
-  // 按钮
-  html += '<div class="end-actions">';
-  if (isHost) {
-    html += '<button class="btn btn-primary" onclick="playAgain()">再来一局 🎮</button>';
-  }
-  html += '<button class="btn btn-secondary" onclick="closeEndScreen();exitGame();">返回大厅</button>';
-  html += '</div>';
-
-  html += '</div></div>';
-
-  var div = document.createElement('div');
-  div.innerHTML = html;
-  document.body.appendChild(div.firstElementChild);
-}
-
-function closeEndScreen() {
-  var el = document.getElementById('endOverlay');
-  if (el) el.remove();
-}
-
-// =====================================================
-// 再来一局（仅房主）
-// =====================================================
-async function playAgain() {
-  if (!isHost) return;
-  if (!confirm('确定重新开始一局吗？所有玩家将同步重置！')) return;
-
-  try {
-    // 重新洗牌
-    var suits = ['spade', 'heart', 'diamond', 'club'];
-    var values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-    var deck = [];
-    for (var s = 0; s < suits.length; s++) {
-      for (var v = 0; v < values.length; v++) {
-        deck.push({ suit: suits[s], value: values[v] });
-      }
-    }
-    deck.push({ suit: 'joker', value: 'small' });
-    deck.push({ suit: 'joker', value: 'big' });
-
-    // Fisher-Yates 洗牌
-    for (var i = deck.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var tmp = deck[i];
-      deck[i] = deck[j];
-      deck[j] = tmp;
-    }
-
-    var turnOrder = (gameState.turn_order || []).slice();
-
-    // 重置游戏状态
-    var resetRes = await supabase
-      .from('game_state')
-      .update({
-        card_pile: deck,
-        current_index: 0,
-        current_turn: turnOrder[0],
-        current_turn_index: 0,
-        drawn_cards: [],
-        special_states: {
-          miss: null,
-          camera: false,
-          crazy: null,
-          toilet: null
-        },
-        status: 'playing',
-        updated_at: new Date().toISOString()
-      })
-      .eq('room_id', roomId)
-      .select();
-
-    if (resetRes.error) throw resetRes.error;
-
-    closeEndScreen();
-    window._gameEndShown = false;
-
-    if (resetRes.data && resetRes.data[0]) {
-      renderAll(resetRes.data[0]);
-    }
-
-    showToast('新的一局开始了！');
-
+    showToast('⏭️ 已跳过', false);
   } catch (err) {
-    console.error('playAgain error:', err);
-    showToast('重开失败：' + (err.message || '未知错误'), true);
+    console.error('skipTurn error:', err);
+    showToast('跳过失败', true);
   }
+}
+
+// ---- 切换历史 ----
+function toggleHistory() {
+  var list = historyList;
+  var label = histLabel;
+  historyOpen = !historyOpen;
+  if (historyOpen) {
+    list.classList.add('open');
+    label.textContent = '收起记录';
+  } else {
+    list.classList.remove('open');
+    label.textContent = '抽牌记录';
+  }
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(text));
+  return div.innerHTML;
 }
 
 // =====================================================
@@ -740,7 +673,7 @@ async function init() {
     return;
   }
 
-  $('gRoomCode').textContent = roomCode;
+  gRoomCode.textContent = roomCode;
   currentPlayerUuid = getPlayerUuid();
   myNickname = getStoredNickname();
 
@@ -811,14 +744,14 @@ async function init() {
             if (plRef.data) players = plRef.data;
             showToast('已重新加入游戏！', false);
           } else {
-            showToast('你不是本房间的玩家', true);
-            setTimeout(function() { window.location.href = 'index.html'; }, 1500);
-            return;
+            // 不是玩家，进入观战模式
+            isSpectator = true;
+            showToast('你将以观战模式观看', false);
           }
         } else {
-          showToast('你不是本房间的玩家', true);
-          setTimeout(function() { window.location.href = 'index.html'; }, 1500);
-          return;
+          // 不是玩家，进入观战模式
+          isSpectator = true;
+          showToast('你将以观战模式观看', false);
         }
       }
     }
@@ -837,6 +770,12 @@ async function init() {
 
     if (gsRes.data) {
       renderAll(gsRes.data);
+      
+      // 如果是观战模式，显示观战入口
+      if (isSpectator) {
+        joinGameBtn.style.display = 'inline-block';
+        joinGameBtn.textContent = '👁️ 进入观战';
+      }
     } else {
       showToast('游戏尚未开始', true);
       setTimeout(function() { window.location.href = 'room.html?room=' + roomCode; }, 1500);
@@ -875,4 +814,3 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-

@@ -7,6 +7,66 @@
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>小姐牌 · 房间</title>
   <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* 观战开关 */
+    .spectator-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0 4px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+    }
+    .spectator-toggle .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .spectator-toggle .toggle-switch.active {
+      background: rgba(74,222,128,0.3);
+    }
+    .spectator-toggle .toggle-switch::after {
+      content: '\'''\'';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .spectator-toggle .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+    /* 观战入口按钮 */
+    .spectator-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #4ade80;
+      background: rgba(74,222,128,0.08);
+      border: 1px solid rgba(74,222,128,0.15);
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .spectator-link:hover {
+      background: rgba(74,222,128,0.12);
+    }
+    .spectator-link .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+  </style>
 </head>
 <body>
   <div class="bg-gradient">
@@ -19,6 +79,12 @@
           <button class="copy-btn" id="copyRoomBtn" onclick="copyRoomCode()">复制房间号</button>
           <button class="copy-btn" id="shareRoomBtn" onclick="shareRoom()">邀请好友</button>
         </div>
+        <!-- 观战入口 -->
+        <div style="text-align:center;margin-top:8px;">
+          <span class="spectator-link" id="spectatorLink" onclick="openSpectator()" style="display:none;">
+            <span class="dot"></span> 进入观战
+          </span>
+        </div>
       </div>
 
       <!-- 玩家列表标题 -->
@@ -29,6 +95,14 @@
         </div>
         <div class="player-list" id="playerList">
           <div class="empty-state">等待玩家加入...</div>
+        </div>
+
+        <!-- 房主控制：观战开关 -->
+        <div id="hostControls" style="display:none;">
+          <div class="spectator-toggle" onclick="toggleSpectatable()">
+            <span>👁️ 允许观战</span>
+            <div class="toggle-switch" id="spectatableSwitch"></div>
+          </div>
         </div>
       </div>
 
@@ -64,7 +138,7 @@
           maxlength="10"
           placeholder="输入你的昵称"
           autocomplete="off"
-          onkeydown="if(event.key==='Enter') confirmNickname()"
+          onkeydown="if(event.key===\'Enter\') confirmNickname()"
         >
         <button class="btn btn-primary" onclick="confirmNickname()">
           进入房间
@@ -79,11 +153,10 @@
   
   <!-- 备用 CDN -->
   <script>window.__supabaseLoaded = false;</script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" onload="window.__supabaseLoaded=true" onerror="console.warn('supabase CDN failed')"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" onload="window.__supabaseLoaded=true" onerror="console.warn(\'supabase CDN failed\')"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
   <script src="js/realtime.js"></script>
   <script src="js/room.js"></script>
 </body>
 </html>
-

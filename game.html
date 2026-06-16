@@ -1,12 +1,12 @@
 ﻿<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang=\"zh-CN\">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="format-detection" content="telephone=no">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta charset=\"UTF-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover\">
+  <meta name=\"format-detection\" content=\"telephone=no\">
+  <meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">
   <title>游戏 - 小姐牌</title>
-  <link rel="stylesheet" href="css/main.css">
+  <link rel=\"stylesheet\" href=\"css/main.css\">
   <style>
     /* ---- 卡牌翻转 ---- */
     .card-scene {
@@ -42,7 +42,7 @@
       cursor: pointer;
     }
     .card-back::after {
-      content: '🃏';
+      content: '\🃏\';
       font-size: 48px;
       opacity: 0.6;
     }
@@ -165,6 +165,92 @@
     }
     .state-tag .emoji { font-size: 14px; }
 
+    /* ---- 抽牌顺序框 ---- */
+    .turn-order-box {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+    }
+    .turn-order-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .turn-order-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .turn-order-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+    .turn-order-item.active {
+      background: rgba(167,139,250,0.15);
+      border: 1px solid rgba(167,139,250,0.3);
+    }
+    .turn-order-item.active .seq {
+      color: #a78bfa;
+    }
+    .turn-order-item.active .name {
+      color: #fff;
+      font-weight: 700;
+    }
+    .turn-order-item.is-my-turn {
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.25);
+    }
+    .turn-order-item.is-my-turn .seq {
+      color: #4ade80;
+    }
+    .turn-order-item.is-my-turn .name {
+      color: #4ade80;
+      font-weight: 700;
+    }
+    .turn-order-item.seen {
+      opacity: 0.5;
+    }
+    .turn-order-item .seq {
+      width: 20px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+      flex-shrink: 0;
+    }
+    .turn-order-item .name {
+      flex: 1;
+      color: rgba(255,255,255,0.7);
+    }
+    .turn-order-item .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .turn-order-item .badge.my {
+      background: rgba(59,130,246,0.2);
+      color: #60a5fa;
+    }
+    .turn-order-item .badge.cards {
+      background: rgba(167,139,250,0.2);
+      color: #a78bfa;
+    }
+    .turn-order-item .badge.drinks {
+      background: rgba(245,158,11,0.2);
+      color: #f59e0b;
+    }
+
     /* ---- 历史 ---- */
     .history-section {
       margin-top: 4px;
@@ -196,35 +282,37 @@
       padding: 6px 8px;
       font-size: 12px;
       color: rgba(255,255,255,0.4);
-      border-bottom: 1px solid rgba(255,255,255,0.03);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
     }
-    .history-item .hs { color: #a78bfa; font-weight: 600; }
-    .history-item .hn { color: rgba(255,255,255,0.6); }
+    .history-item:last-child { border-bottom: none; }
+    .history-item .h-seq { color: rgba(255,255,255,0.2); width: 20px; }
+    .history-item .h-card { font-weight: 600; }
+    .history-item .h-rule { color: #a78bfa; }
+    .history-item .h-by { color: rgba(255,255,255,0.3); }
 
-    /* ---- 响应式 ---- */
-    @media (max-width: 360px) {
-      .card-scene { width: 140px; height: 196px; }
-      .card-front .cv { font-size: 30px; }
-      .card-front .cs { font-size: 24px; }
+    /* ---- 加入游戏按钮 ---- */
+    .join-game-btn {
+      display: none;
+      margin-top: 8px;
     }
-    @media (min-height: 740px) {
-      .card-scene { width: 180px; height: 252px; }
-    }
-      /* ---- 结算弹窗 ---- */
-    .end-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.75);
+
+    /* ---- 游戏结束弹窗 ---- */
+    .end-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
       backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 150;
       padding: 20px;
-      animation: modal-in 0.4s ease-out;
     }
-    .end-box {
+    .end-modal.show { display: flex; }
+    .end-content {
       background: #1a1a35;
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 24px;
+      border-radius: 20px;
       padding: 32px 24px 24px;
       width: 100%;
       max-width: 400px;
@@ -233,18 +321,24 @@
       position: relative;
     }
     .end-close {
-      position: absolute; top: 12px; right: 16px;
-      font-size: 20px; color: rgba(255,255,255,0.3);
-      cursor: pointer; padding: 4px;
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 20px;
+      color: rgba(255,255,255,0.3);
+      cursor: pointer;
+      padding: 4px;
     }
     .end-title {
       text-align: center;
-      font-size: 26px; font-weight: 800;
+      font-size: 26px;
+      font-weight: 800;
       margin-bottom: 4px;
     }
     .end-sub {
       text-align: center;
-      font-size: 14px; color: rgba(255,255,255,0.4);
+      font-size: 14px;
+      color: rgba(255,255,255,0.4);
       margin-bottom: 16px;
     }
     .end-highlights {
@@ -271,7 +365,8 @@
     }
     .end-player:last-child { border-bottom: none; }
     .ep-name {
-      font-size: 15px; font-weight: 600;
+      font-size: 15px;
+      font-weight: 600;
       color: rgba(255,255,255,0.8);
       margin-bottom: 2px;
     }
@@ -289,91 +384,142 @@
       flex-direction: column;
       gap: 10px;
     }
-    </style>
+
+    /* ---- 观战标签 ---- */
+    .spectator-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.2);
+      border-radius: 20px;
+      font-size: 12px;
+      color: #4ade80;
+      font-weight: 600;
+    }
+    .spectator-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: live-pulse 1.5s infinite;
+    }
+    @keyframes live-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
 </head>
 <body>
-  <div class="bg-gradient">
-    <div class="page" id="gamePage" style="display:none;">
+  <div class=\"bg-gradient\">
+    <div class=\"page\" id=\"gamePage\" style=\"display:none;\">
       <!-- 顶栏 -->
-      <div class="info-bar">
-        <span onclick="exitGame()" style="cursor:pointer;">← <span id="gRoomCode">----</span></span>
-        <span style="display:flex;align-items:center;gap:12px;">
-          <span onclick="shareGame()" style="cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);">分享</span>
-          <span class="round"><span id="roundNum">0</span>/<span id="totalCards">54</span> 轮</span>
+      <div class=\"info-bar\">
+        <span onclick=\"exitGame()\" style=\"cursor:pointer;\">← <span id=\"gRoomCode\">----</span></span>
+        <span style=\"display:flex;align-items:center;gap:12px;\">
+          <span onclick=\"shareGame()\" style=\"cursor:pointer;font-size:13px;color:rgba(255,255,255,0.5);\">分享</span>
+          <span class=\"round\"><span id=\"roundNum\">0</span>/<span id=\"totalCards\">54</span> 轮</span>
         </span>
       </div>
 
       <!-- 卡牌区 -->
-      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:8px 0;">
-        <div class="card-scene" id="cardScene">
-          <div class="card-wrapper" id="cardWrapper">
+      <div style=\"flex:1;display:flex;flex-direction:column;justify-content:center;padding:8px 0;\">
+        <div class=\"card-scene\" id=\"cardScene\">
+          <div class=\"card-wrapper\" id=\"cardWrapper\">
             <!-- 背面 -->
-            <div class="card-face card-back" id="cardBack" onclick="onCardClick()">
-              <span id="backHint">点击抽牌</span>
+            <div class=\"card-face card-back\" id=\"cardBack\" onclick=\"onCardClick()\">
+              <span id=\"backHint\">点击抽牌</span>
             </div>
             <!-- 正面 -->
-            <div class="card-face card-front" id="cardFront">
-              <div class="cjoker" id="cJoker"></div>
-              <div class="cv" id="cValue"></div>
-              <div class="cs" id="cSuit"></div>
-              <div class="card-draw-hint" id="cardWho"></div>
+            <div class=\"card-face card-front\" id=\"cardFront\">
+              <div class=\"cjoker\" id=\"cJoker\"></div>
+              <div class=\"cv\" id=\"cValue\"></div>
+              <div class=\"cs\" id=\"cSuit\"></div>
+              <div class=\"card-draw-hint\" id=\"cardWho\"></div>
             </div>
           </div>
         </div>
 
         <!-- 规则 -->
-        <div class="rule-display">
-          <div class="r-emoji" id="rEmoji"></div>
-          <div class="r-name" id="rName"></div>
-          <div class="r-desc" id="rDesc"></div>
-          <div class="r-who" id="rWho"></div>
+        <div class=\"rule-display\">
+          <div class=\"r-emoji\" id=\"rEmoji\"></div>
+          <div class=\"r-name\" id=\"rName\"></div>
+          <div class=\"r-desc\" id=\"rDesc\"></div>
+          <div class=\"r-who\" id=\"rWho\"></div>
         </div>
       </div>
 
       <!-- 抽牌按钮 / 轮到 -->
-      <div id="actionArea">
-        <button class="btn btn-primary" id="drawBtn" onclick="drawCard()" style="display:none;">
+      <div id=\"actionArea\">
+        <button class=\"btn btn-primary\" id=\"drawBtn\" onclick=\"drawCard()\" style=\"display:none;\">
           抽牌 🃏
         </button>
-        <div class="turn-indicator" id="turnIndicator">
-          轮到: <strong id="turnPlayer">--</strong>
+        <div class=\"turn-indicator\" id=\"turnIndicator\">
+          轮到: <strong id=\"turnPlayer\">--</strong>
         </div>
-        <button class="btn btn-secondary btn-small" id="skipBtn" onclick="skipTurn()" style="display:none;">
+        <button class=\"btn btn-secondary btn-small\" id=\"skipBtn\" onclick=\"skipTurn()\" style=\"display:none;\">
           ⏭️ 跳过离线玩家
+        </button>
+        <!-- 游戏途中加入按钮 -->
+        <button class=\"btn btn-secondary btn-small join-game-btn\" id=\"joinGameBtn\" onclick=\"joinAsSpectator()\">
+          👁️ 进入观战
         </button>
       </div>
 
-      <!-- 特殊状态 & 历史 -->
-      <div class="card" style="padding:12px 16px;margin-bottom:0;">
-        <div class="states-bar" id="statesBar"></div>
-        <div class="history-section">
-          <button class="history-toggle" onclick="toggleHistory()">
-            ▸ <span id="histLabel">抽牌记录</span>
+      <!-- 抽牌顺序 & 特殊状态 & 历史 -->
+      <div class=\"card\" style=\"padding:12px 16px;margin-bottom:0;\">
+        <!-- 抽牌顺序 -->
+        <div class=\"turn-order-box\">
+          <div class=\"turn-order-title\">🎴 抽牌顺序</div>
+          <div class=\"turn-order-list\" id=\"turnOrderList\"></div>
+        </div>
+        
+        <!-- 特殊状态 -->
+        <div class=\"states-bar\" id=\"statesBar\"></div>
+        
+        <!-- 历史记录 -->
+        <div class=\"history-section\">
+          <button class=\"history-toggle\" onclick=\"toggleHistory()\">
+            ▸ <span id=\"histLabel\">抽牌记录</span>
           </button>
-          <div class="history-list" id="historyList"></div>
+          <div class=\"history-list\" id=\"historyList\"></div>
         </div>
       </div>
     </div>
 
     <!-- 加载 -->
-    <div class="page" id="loadingPage">
-      <div class="loading-page">
-        <div class="loading-spinner"></div>
+    <div class=\"page\" id=\"loadingPage\">
+      <div class=\"loading-page\">
+        <div class=\"loading-spinner\"></div>
         <span>加载游戏...</span>
       </div>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <!-- 游戏结束弹窗 -->
+  <div class=\"end-modal\" id=\"endModal\">
+    <div class=\"end-content\">
+      <span class=\"end-close\" onclick=\"closeEndModal()\">✕</span>
+      <div class=\"end-title\" id=\"endTitle\">🎉 游戏结束</div>
+      <div class=\"end-sub\" id=\"endSub\">所有牌已抽完</div>
+      <div class=\"end-highlights\" id=\"endHighlights\"></div>
+      <div class=\"end-stats\" id=\"endStats\"></div>
+      <div class=\"end-actions\">
+        <button class=\"btn btn-primary\" onclick=\"playAgain()\">再来一局</button>
+        <button class=\"btn btn-secondary\" onclick=\"closeEndModal()\">返回房间</button>
+      </div>
+    </div>
+  </div>
 
-  
+  <div class=\"toast\" id=\"toast\"></div>
+
   <!-- 备用 CDN -->
   <script>window.__supabaseLoaded = false;</script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" onload="window.__supabaseLoaded=true" onerror="console.warn('supabase CDN failed')"></script>
-  <script src="js/config.js"></script>
-  <script src="js/supabase.js"></script>
-  <script src="js/realtime.js"></script>
-  <script src="js/game.js"></script>
+  <script src=\"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js\" onload=\"window.__supabaseLoaded=true\" onerror=\"console.warn('supabase CDN failed')\"></script>
+  <script src=\"js/config.js\"></script>
+  <script src=\"js/supabase.js\"></script>
+  <script src=\"js/realtime.js\"></script>
+  <script src=\"js/game.js\"></script>
 </body>
 </html>
-
