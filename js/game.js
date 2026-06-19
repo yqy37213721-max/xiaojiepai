@@ -343,7 +343,7 @@ function renderAll(gs) {
   isMyTurn = (currentPlayer && currentPlayer.player_uuid === currentPlayerUuid);
   
   // 抽牌按钮显示
-  var drawBtn = drawBtn;
+  var drawBtn = document.getElementById("drawBtn");
   if (isMyTurn && !isDrawing && !isSpectator) {
     drawBtn.style.display = 'block';
     backHint.textContent = '轮到你了！点击抽牌';
@@ -357,7 +357,7 @@ function renderAll(gs) {
   }
 
   // 跳过按钮显示
-  var skipBtn = skipBtn;
+  var skipBtn = document.getElementById("skipBtn");
   if (!isMyTurn && !isSpectator && currentPlayer && !currentPlayer.is_online) {
     skipBtn.style.display = 'inline-block';
   } else {
