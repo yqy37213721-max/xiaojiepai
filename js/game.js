@@ -462,7 +462,8 @@ async function drawCard() {
     // 计算下一个玩家
     var turnOrder = gameState.turn_order || [];
     var nextIndex = (gameState.current_turn_index || 0) + 1;
-    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
+    if (nextIndex >= turnOrder.length) nextIndex = 0;
+    var nextSeat = turnOrder[nextIndex];
 
     // 更新游戏状态
     var updateData = {
@@ -623,7 +624,8 @@ async function skipTurn() {
   try {
     var nextIndex = (gameState.current_turn_index || 0) + 1;
     var turnOrder = gameState.turn_order || [];
-    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
+    if (nextIndex >= turnOrder.length) nextIndex = 0;
+    var nextSeat = turnOrder[nextIndex];
 
     await supabase
       .from('game_state')
