@@ -489,10 +489,22 @@ async function drawCard() {
       .update(updateData)
       .eq('room_id', roomId)
       .eq('current_turn_index', gameState.current_turn_index)
-      .select()
-      .single();
+      .select();
 
     if (res.error) throw res.error;
+    if (!res.data || res.data.length === 0) {
+      // 并发冲突，重新拉取最新状态
+      var refreshRes = await supabase.from('game_state').select('*').eq('room_id', roomId).single();
+      if (refreshRes.data) {
+        gameState = refreshRes.data;
+        renderAll(gameState);
+      }
+      showToast('请重试', true);
+      isDrawing = false;
+      drawBtn.disabled = false;
+      return;
+    }
+    var resData = res.data[0];
 
     // 更新玩家抽牌计数
     var me = getPlayerByUuid(currentPlayerUuid);
@@ -510,7 +522,7 @@ async function drawCard() {
     await handleCardEffect(card);
 
     // 立即更新本地状态，不依赖 Realtime 推送
-    gameState = res.data;
+    gameState = resData;
     renderAll(gameState);
 
   } catch (err) {
@@ -631,7 +643,7 @@ async function skipTurn() {
     if (nextIndex >= turnOrder.length) nextIndex = 0;
     var nextSeat = turnOrder[nextIndex];
 
-    await supabase
+    var skipRes = await supabase
       .from('game_state')
       .update({
         current_turn: nextSeat,
@@ -639,7 +651,12 @@ async function skipTurn() {
         updated_at: new Date().toISOString()
       })
       .eq('room_id', roomId)
-      .eq('current_turn_index', gameState.current_turn_index);
+      .eq('current_turn_index', gameState.current_turn_index)
+      .select();
+    if (skipRes.data && skipRes.data.length > 0) {
+      gameState = skipRes.data[0];
+      renderAll(gameState);
+    }
 
     showToast('⏭️ 已跳过', false);
   } catch (err) {
