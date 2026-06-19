@@ -509,6 +509,10 @@ async function drawCard() {
     // 根据牌面处理喝酒逻辑
     await handleCardEffect(card);
 
+    // 立即更新本地状态，不依赖 Realtime 推送
+    gameState = res.data;
+    renderAll(gameState);
+
   } catch (err) {
     console.error('drawCard error:', err);
     showToast('抽牌失败：' + (err.message || '未知错误'), true);
