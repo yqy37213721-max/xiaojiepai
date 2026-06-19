@@ -30,7 +30,7 @@
       background: rgba(74,222,128,0.3);
     }
     .spectator-toggle .toggle-switch::after {
-      content: '\'''\'';
+      content: '';
       position: absolute;
       top: 2px;
       left: 2px;
@@ -138,7 +138,7 @@
           maxlength="10"
           placeholder="输入你的昵称"
           autocomplete="off"
-          onkeydown="if(event.key===\'Enter\') confirmNickname()"
+          onkeydown="if(event.key==='Enter') confirmNickname()"
         >
         <button class="btn btn-primary" onclick="confirmNickname()">
           进入房间
@@ -153,7 +153,7 @@
   
   <!-- 备用 CDN -->
   <script>window.__supabaseLoaded = false;</script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" onload="window.__supabaseLoaded=true" onerror="console.warn(\'supabase CDN failed\')"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" onload="window.__supabaseLoaded=true" onerror="console.warn('supabase CDN failed')"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase.js"></script>
   <script src="js/realtime.js"></script>
