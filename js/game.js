@@ -356,9 +356,9 @@ function renderAll(gs) {
     }
   }
 
-  // 跳过按钮显示
+  // 跳过按钮显示：轮到别人时显示（可跳过离线/卡住的玩家）；轮到自己时显示"跳过不抽"
   var skipBtn = document.getElementById("skipBtn");
-  if (!isMyTurn && !isSpectator && currentPlayer && !currentPlayer.is_online) {
+  if (!isSpectator && currentPlayer) {
     skipBtn.style.display = 'inline-block';
   } else {
     skipBtn.style.display = 'none';
@@ -459,10 +459,15 @@ async function drawCard() {
     var card = pile.shift();
     drawn.push(card);
 
-    // 计算下一个玩家
+    // 计算下一个玩家（循环轮转，防止越界）
     var turnOrder = gameState.turn_order || [];
-    var nextIndex = (gameState.current_turn_index || 0) + 1;
-    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
+    if (!turnOrder || turnOrder.length === 0) {
+      showToast('玩家顺序数据异常', true);
+      isDrawing = false;
+      return;
+    }
+    var nextIndex = ((gameState.current_turn_index || 0) + 1) % turnOrder.length;
+    var nextSeat = turnOrder[nextIndex];
 
     // 更新游戏状态
     var updateData = {
@@ -618,14 +623,18 @@ function getRightSeat(seat) {
 }
 
 async function skipTurn() {
-  if (!gameState) return;
+  if (!gameState || isDrawing) return;
   
   try {
-    var nextIndex = (gameState.current_turn_index || 0) + 1;
     var turnOrder = gameState.turn_order || [];
-    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
+    if (!turnOrder || turnOrder.length === 0) {
+      showToast('玩家顺序数据异常', true);
+      return;
+    }
+    var nextIndex = ((gameState.current_turn_index || 0) + 1) % turnOrder.length;
+    var nextSeat = turnOrder[nextIndex];
 
-    await supabase
+    var res = await supabase
       .from('game_state')
       .update({
         current_turn: nextSeat,
@@ -633,12 +642,23 @@ async function skipTurn() {
         updated_at: new Date().toISOString()
       })
       .eq('room_id', roomId)
-      .eq('current_turn_index', gameState.current_turn_index);
+      .eq('current_turn_index', gameState.current_turn_index)
+      .select()
+      .single();
 
-    showToast('⏭️ 已跳过', false);
+    if (res.error) throw res.error;
+
+    var skippedSeat = gameState.current_turn;
+    var skippedPlayer = getPlayerBySeat(skippedSeat);
+    var skippedName = skippedPlayer ? skippedPlayer.nickname : ('玩家 ' + skippedSeat);
+    showToast('⏭️ 已跳过 ' + skippedName, false);
   } catch (err) {
     console.error('skipTurn error:', err);
-    showToast('跳过失败', true);
+    if (err && err.code === 'PGRST116') {
+      showToast('已有其他人跳过了，稍等', false);
+    } else {
+      showToast('跳过失败', true);
+    }
   }
 }
 
