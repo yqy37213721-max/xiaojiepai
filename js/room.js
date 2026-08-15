@@ -528,8 +528,8 @@ function buildDeck() {
       deck.push({ suit: suits[s], value: values[v] });
     }
   }
-  deck.push({ suit: "joker", value: "small" });
-  deck.push({ suit: "joker", value: "big" });
+  deck.push({ suit: "joker", value: "small_joker" });
+  deck.push({ suit: "joker", value: "big_joker" });
   return deck;
 }
 
