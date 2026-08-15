@@ -18,8 +18,8 @@ var CARD_RULES = {
   'J':    { name:'左边喝',   emoji:'👈', desc:'抽牌者左边的人喝 1 杯！🍺' },
   'Q':    { name:'右边喝',   emoji:'👉', desc:'抽牌者右边的人喝 1 杯！🍺' },
   'K':    { name:'自定规矩', emoji:'📜', desc:'抽牌者自己喝 1 杯🍺，并为游戏定一条新规矩！全场必须遵守！' },
-  'small_joker': { name:'大冒险', emoji:'🃏', desc:'抽到者完成一个大冒险挑战！🃏 指定在场一人出题，必须完成，拒绝则喝 2 杯！' },
-  'big_joker':   { name:'大冒险', emoji:'🃏', desc:'超级大冒险！🃏 抽到者自选或由全场出题，完成一个高难度挑战！拒绝则喝 3 杯！' }
+  'small_joker': { name:'真心话', emoji:'🃏', desc:'抽到者指定任意一人回答一个真心话问题！🃏 必须诚实回答，拒绝则喝 2 杯！' },
+  'big_joker':   { name:'大冒险', emoji:'🃏', desc:'抽到者指定任意一人完成一个大冒险挑战！🃏 拒绝则喝 3 杯！' }
 };
 
 var SUIT_SYMBOLS = { spade:'♠', heart:'♥', diamond:'♦', club:'♣' };
@@ -583,12 +583,12 @@ async function handleCardEffect(card) {
         showToast('📜 自罚一杯并定规矩！');
         break;
       
-      case 'small_joker': // 小王 = 大冒险
-        showToast('🃏 大冒险！完成挑战，拒绝喝 2 杯');
+      case 'small_joker': // 小王 = 真心话
+        showToast('🃏 真心话！指定一人诚实回答，拒绝喝 2 杯');
         break;
       
       case 'big_joker': // 大王 = 大冒险
-        showToast('🃏 超级大冒险！完成挑战，拒绝喝 3 杯');
+        showToast('🃏 大冒险！指定一人完成挑战，拒绝喝 3 杯');
         break;
     }
   } catch (err) {
