@@ -17,8 +17,8 @@ var CARD_RULES = {
   'J':    { name:'左边喝',   emoji:'👈', desc:'抽牌者左边的人喝 1 杯！🍺' },
   'Q':    { name:'右边喝',   emoji:'👉', desc:'抽牌者右边的人喝 1 杯！🍺' },
   'K':    { name:'自定规矩', emoji:'📜', desc:'抽牌者自己喝 1 杯🍺，并为游戏定一条新规矩！全场必须遵守！' },
-  'small_joker': { name:'小王', emoji:'🃏', desc:'小王驾到！指定任意一人喝 1 杯！🍺' },
-  'big_joker':   { name:'大王', emoji:'🃏', desc:'大王驾到！指定任意一人喝 2 杯！！🍺🍺' }
+  'small_joker': { name:'大冒险', emoji:'🃏', desc:'抽到者完成一个大冒险挑战！🃏 指定在场一人出题，必须完成，拒绝则喝 2 杯！' },
+  'big_joker':   { name:'大冒险', emoji:'🃏', desc:'超级大冒险！🃏 抽到者自选或由全场出题，完成一个高难度挑战！拒绝则喝 3 杯！' }
 };
 
 var SUIT_SYMBOLS = { spade:'♠', heart:'♥', diamond:'♦', club:'♣' };
@@ -56,7 +56,7 @@ function getPlayerBySeat(seat) {
 // ---- 卡牌显示 ----
 function getCardDisplay(card) {
   if (card.suit === 'joker') {
-    var label = card.value === 'small' ? '小' : '大';
+    var label = card.value === 'small_joker' ? '小' : '大';
     return { symbol: label, suit: '🃏', color: '#8b5cf6', isJoker: true };
   }
   return {
