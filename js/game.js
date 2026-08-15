@@ -462,8 +462,7 @@ async function drawCard() {
     // 计算下一个玩家
     var turnOrder = gameState.turn_order || [];
     var nextIndex = (gameState.current_turn_index || 0) + 1;
-    if (nextIndex >= turnOrder.length) nextIndex = 0;
-    var nextSeat = turnOrder[nextIndex];
+    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
 
     // 更新游戏状态
     var updateData = {
@@ -489,22 +488,10 @@ async function drawCard() {
       .update(updateData)
       .eq('room_id', roomId)
       .eq('current_turn_index', gameState.current_turn_index)
-      .select();
+      .select()
+      .single();
 
     if (res.error) throw res.error;
-    if (!res.data || res.data.length === 0) {
-      // 并发冲突，重新拉取最新状态
-      var refreshRes = await supabase.from('game_state').select('*').eq('room_id', roomId).single();
-      if (refreshRes.data) {
-        gameState = refreshRes.data;
-        renderAll(gameState);
-      }
-      showToast('请重试', true);
-      isDrawing = false;
-      drawBtn.disabled = false;
-      return;
-    }
-    var resData = res.data[0];
 
     // 更新玩家抽牌计数
     var me = getPlayerByUuid(currentPlayerUuid);
@@ -520,10 +507,6 @@ async function drawCard() {
 
     // 根据牌面处理喝酒逻辑
     await handleCardEffect(card);
-
-    // 立即更新本地状态，不依赖 Realtime 推送
-    gameState = resData;
-    renderAll(gameState);
 
   } catch (err) {
     console.error('drawCard error:', err);
@@ -640,10 +623,9 @@ async function skipTurn() {
   try {
     var nextIndex = (gameState.current_turn_index || 0) + 1;
     var turnOrder = gameState.turn_order || [];
-    if (nextIndex >= turnOrder.length) nextIndex = 0;
-    var nextSeat = turnOrder[nextIndex];
+    var nextSeat = nextIndex < turnOrder.length ? turnOrder[nextIndex] : null;
 
-    var skipRes = await supabase
+    await supabase
       .from('game_state')
       .update({
         current_turn: nextSeat,
@@ -651,12 +633,7 @@ async function skipTurn() {
         updated_at: new Date().toISOString()
       })
       .eq('room_id', roomId)
-      .eq('current_turn_index', gameState.current_turn_index)
-      .select();
-    if (skipRes.data && skipRes.data.length > 0) {
-      gameState = skipRes.data[0];
-      renderAll(gameState);
-    }
+      .eq('current_turn_index', gameState.current_turn_index);
 
     showToast('⏭️ 已跳过', false);
   } catch (err) {
